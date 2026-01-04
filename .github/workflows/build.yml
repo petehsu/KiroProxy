@@ -9,23 +9,13 @@ on:
 permissions:
   contents: write
 
-jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            platform: Linux
-            artifact: KiroProxy
-          - os: windows-latest
-            platform: Windows
-            artifact: KiroProxy.exe
-          - os: macos-latest
-            platform: macOS
-            artifact: KiroProxy
+env:
+  APP_NAME: KiroProxy
+  VERSION: "1.0.0"
 
-    runs-on: ${{ matrix.os }}
-    
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
@@ -39,9 +29,112 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+          
+      - name: Build binary
+        run: python build.py
+        
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev rubygems build-essential rpm libfuse2
+          sudo gem install --no-document fpm
+          
+      - name: Create packages
+        run: |
+          mkdir -p release
+          VERSION=${{ env.VERSION }}
+          
+          # Binary (standalone)
+          cp dist/KiroProxy release/KiroProxy-${VERSION}-linux-x86_64
+          chmod +x release/KiroProxy-${VERSION}-linux-x86_64
+          
+          # tar.gz
+          tar -czvf release/KiroProxy-${VERSION}-linux-x86_64.tar.gz -C dist KiroProxy
+          
+          # deb package
+          fpm -s dir -t deb \
+            -n kiroproxy \
+            -v ${VERSION} \
+            --description "Kiro API Proxy Server" \
+            --license "MIT" \
+            --architecture amd64 \
+            --maintainer "petehsu" \
+            --url "https://github.com/petehsu/KiroProxy" \
+            -p release/kiroproxy_${VERSION}_amd64.deb \
+            dist/KiroProxy=/usr/local/bin/KiroProxy
+          
+          # rpm package
+          fpm -s dir -t rpm \
+            -n kiroproxy \
+            -v ${VERSION} \
+            --description "Kiro API Proxy Server" \
+            --license "MIT" \
+            --architecture x86_64 \
+            --maintainer "petehsu" \
+            --url "https://github.com/petehsu/KiroProxy" \
+            -p release/kiroproxy-${VERSION}-1.x86_64.rpm \
+            dist/KiroProxy=/usr/local/bin/KiroProxy
+            
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: KiroProxy-Linux
+          path: release/*
 
-      - name: Generate macOS icon
-        if: matrix.os == 'macos-latest'
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          
+      - name: Build
+        run: python build.py
+        
+      - name: Create packages
+        shell: pwsh
+        run: |
+          $VERSION = "${{ env.VERSION }}"
+          New-Item -ItemType Directory -Force -Path release
+          
+          # exe (standalone)
+          Copy-Item dist/KiroProxy.exe release/KiroProxy-${VERSION}-windows-x86_64.exe
+          
+          # zip
+          Compress-Archive -Path dist/KiroProxy.exe -DestinationPath release/KiroProxy-${VERSION}-windows-x86_64.zip
+          
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: KiroProxy-Windows
+          path: release/*
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          
+      - name: Generate icon
         run: |
           mkdir -p assets/icon.iconset
           for size in 16 32 64 128 256 512; do
@@ -52,20 +145,26 @@ jobs:
       - name: Build
         run: python build.py
         
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: KiroProxy-${{ matrix.platform }}
-          path: dist/${{ matrix.artifact }}
+      - name: Create packages
+        run: |
+          VERSION=${{ env.VERSION }}
+          mkdir -p release
           
-      - name: Upload release package
+          # Binary (standalone)
+          cp dist/KiroProxy release/KiroProxy-${VERSION}-macos-x86_64
+          chmod +x release/KiroProxy-${VERSION}-macos-x86_64
+          
+          # zip
+          cd dist && zip -r ../release/KiroProxy-${VERSION}-macos-x86_64.zip KiroProxy && cd ..
+          
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: KiroProxy-${{ matrix.platform }}-Release
+          name: KiroProxy-macOS
           path: release/*
 
   release:
-    needs: build
+    needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     
@@ -75,13 +174,30 @@ jobs:
         with:
           path: artifacts
           
+      - name: List artifacts
+        run: find artifacts -type f
+          
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          name: KiroProxy v${{ env.VERSION }}
+          body: |
+            ## Downloads
+            
+            | Platform | File | Description |
+            |----------|------|-------------|
+            | **Linux** | `KiroProxy-${{ env.VERSION }}-linux-x86_64` | Standalone binary |
+            | | `KiroProxy-${{ env.VERSION }}-linux-x86_64.tar.gz` | Compressed archive |
+            | | `kiroproxy_${{ env.VERSION }}_amd64.deb` | Debian/Ubuntu package |
+            | | `kiroproxy-${{ env.VERSION }}-1.x86_64.rpm` | Fedora/RHEL/CentOS package |
+            | **Windows** | `KiroProxy-${{ env.VERSION }}-windows-x86_64.exe` | Standalone executable |
+            | | `KiroProxy-${{ env.VERSION }}-windows-x86_64.zip` | Compressed archive |
+            | **macOS** | `KiroProxy-${{ env.VERSION }}-macos-x86_64` | Standalone binary |
+            | | `KiroProxy-${{ env.VERSION }}-macos-x86_64.zip` | Compressed archive |
           files: |
-            artifacts/KiroProxy-Linux-Release/*
-            artifacts/KiroProxy-Windows-Release/*
-            artifacts/KiroProxy-macOS-Release/*
+            artifacts/KiroProxy-Linux/*
+            artifacts/KiroProxy-Windows/*
+            artifacts/KiroProxy-macOS/*
           draft: false
           prerelease: false
         env:

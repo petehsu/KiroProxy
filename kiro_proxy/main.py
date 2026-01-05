@@ -91,6 +91,11 @@ async def models():
 async def anthropic_messages(request: Request):
     return await anthropic.handle_messages(request)
 
+@app.post("/v1/messages/count_tokens")
+async def anthropic_count_tokens(request: Request):
+    return await anthropic.handle_count_tokens(request)
+
+
 
 # OpenAI 协议
 @app.post("/v1/chat/completions")

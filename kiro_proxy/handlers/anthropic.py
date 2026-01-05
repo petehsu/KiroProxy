@@ -18,6 +18,56 @@ from ..converters import (
 )
 
 
+def _extract_text_from_content(content) -> str:
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            parts.append(_extract_text_from_content(item))
+        return "".join(parts)
+    if isinstance(content, dict):
+        if "text" in content and isinstance(content.get("text"), str):
+            return content["text"]
+        if "content" in content:
+            return _extract_text_from_content(content.get("content"))
+    return ""
+
+
+def _estimate_tokens(text: str) -> int:
+    if not text:
+        return 0
+    return (len(text) + 3) // 4
+
+
+def _count_tokens_from_messages(messages, system: str = "") -> int:
+    total = _estimate_tokens(system) if system else 0
+    for msg in messages or []:
+        total += _estimate_tokens(_extract_text_from_content(msg.get("content")))
+    return total
+
+
+def _classify_kiro_error(error_text: str):
+    lowered = error_text.lower()
+    if "model_temporarily_unavailable" in error_text or "unexpectedly high load" in lowered:
+        return 503, "overloaded_error", "Model temporarily unavailable, please retry."
+    if "content_length_exceeds_threshold" in error_text or "too long" in lowered:
+        return 400, "invalid_request_error", "Conversation too long, please /clear or start a new chat."
+    return 500, "api_error", "Upstream API error."
+
+
+async def handle_count_tokens(request: Request):
+    '''Handle /v1/messages/count_tokens requests.'''
+    body = await request.json()
+    messages = body.get("messages", [])
+    system = body.get("system", "")
+    if not messages and not system:
+        raise HTTPException(400, "messages required")
+    return {"input_tokens": _count_tokens_from_messages(messages, system)}
+
+
 async def handle_messages(request: Request):
     """处理 /v1/messages 请求"""
     start_time = time.time()
@@ -68,7 +118,7 @@ async def handle_messages(request: Request):
 
 
 async def _handle_stream(kiro_request, headers, account, model, log_id, start_time):
-    """流式响应处理"""
+    """Handle streaming responses."""
     async def generate():
         try:
             async with httpx.AsyncClient(verify=False, timeout=300) as client:
@@ -77,7 +127,7 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                         state.mark_rate_limited(account.id)
                         yield f'data: {{"type":"error","error":{{"type":"rate_limit_error","message":"Rate limited"}}}}\n\n'
                         return
-                    
+
                     if response.status_code != 200:
                         error_text = await response.aread()
                         error_str = error_text.decode()
@@ -85,26 +135,20 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                         print(f"Status: {response.status_code}")
                         print(f"Response: {error_str[:500]}")
                         print(f"======================")
-                        
-                        # 友好的错误消息
-                        if "CONTENT_LENGTH_EXCEEDS_THRESHOLD" in error_str or "too long" in error_str.lower():
-                            error_msg = "对话太长，请使用 /clear 或开始新对话"
-                        else:
-                            error_msg = f"API error: {response.status_code}"
-                        
-                        yield f'data: {{"type":"error","error":{{"type":"api_error","message":"{error_msg}"}}}}\n\n'
+
+                        _, error_type, error_msg = _classify_kiro_error(error_str)
+                        yield f'data: {{"type":"error","error":{{"type":"{error_type}","message":"{error_msg}"}}}}\n\n'
                         return
-                    
+
                     msg_id = f"msg_{log_id}"
                     yield f'data: {{"type":"message_start","message":{{"id":"{msg_id}","type":"message","role":"assistant","content":[],"model":"{model}","stop_reason":null,"stop_sequence":null,"usage":{{"input_tokens":0,"output_tokens":0}}}}}}\n\n'
                     yield f'data: {{"type":"content_block_start","index":0,"content_block":{{"type":"text","text":""}}}}\n\n'
-                    
+
                     full_response = b""
-                    
+
                     async for chunk in response.aiter_bytes():
                         full_response += chunk
-                        
-                        # 实时解析文本
+
                         try:
                             pos = 0
                             while pos < len(chunk):
@@ -116,7 +160,7 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                                 headers_len = int.from_bytes(chunk[pos+4:pos+8], 'big')
                                 payload_start = pos + 12 + headers_len
                                 payload_end = pos + total_len - 4
-                                
+
                                 if payload_start < payload_end:
                                     try:
                                         payload = json.loads(chunk[payload_start:payload_end].decode('utf-8'))
@@ -127,64 +171,60 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                                             content = payload['content']
                                         if content:
                                             yield f'data: {{"type":"content_block_delta","index":0,"delta":{{"type":"text_delta","text":{json.dumps(content)}}}}}\n\n'
-                                    except:
+                                    except Exception:
                                         pass
                                 pos += total_len
-                        except:
+                        except Exception:
                             pass
-                    
-                    # 解析完整响应获取工具调用
+
                     result = parse_event_stream_full(full_response)
-                    
+
                     yield f'data: {{"type":"content_block_stop","index":0}}\n\n'
-                    
-                    # 发送工具调用
+
                     if result["tool_uses"]:
                         for i, tool_use in enumerate(result["tool_uses"], 1):
                             yield f'data: {{"type":"content_block_start","index":{i},"content_block":{{"type":"tool_use","id":"{tool_use["id"]}","name":"{tool_use["name"]}","input":{{}}}}}}\n\n'
                             yield f'data: {{"type":"content_block_delta","index":{i},"delta":{{"type":"input_json_delta","partial_json":{json.dumps(json.dumps(tool_use["input"]))}}}}}\n\n'
                             yield f'data: {{"type":"content_block_stop","index":{i}}}\n\n'
-                    
+
                     stop_reason = result["stop_reason"]
                     yield f'data: {{"type":"message_delta","delta":{{"stop_reason":"{stop_reason}","stop_sequence":null}},"usage":{{"output_tokens":100}}}}\n\n'
                     yield f'data: {{"type":"message_stop"}}\n\n'
-                    
+
                     account.request_count += 1
                     account.last_used = time.time()
-                    
+
         except Exception as e:
             yield f'data: {{"type":"error","error":{{"type":"api_error","message":"{str(e)}"}}}}\n\n'
-    
+
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 async def _handle_non_stream(kiro_request, headers, account, model, log_id, start_time):
-    """非流式响应处理"""
+    """Handle non-streaming responses."""
     error_msg = None
     status_code = 200
-    
+
     try:
         async with httpx.AsyncClient(verify=False, timeout=300) as client:
             response = await client.post(KIRO_API_URL, json=kiro_request, headers=headers)
             status_code = response.status_code
-            
+
             if response.status_code == 429:
                 state.mark_rate_limited(account.id)
                 raise HTTPException(429, "Rate limited")
-            
+
             if response.status_code != 200:
                 error_msg = response.text
-                # 友好的错误消息
-                if "CONTENT_LENGTH_EXCEEDS_THRESHOLD" in error_msg or "too long" in error_msg.lower():
-                    raise HTTPException(400, "对话太长，请使用 /clear 或开始新对话")
-                raise HTTPException(response.status_code, response.text)
-            
+                status, _, error_message = _classify_kiro_error(error_msg)
+                raise HTTPException(status, error_message)
+
             result = parse_event_stream_full(response.content)
             account.request_count += 1
             account.last_used = time.time()
-            
+
             return convert_kiro_response_to_anthropic(result, model, f"msg_{log_id}")
-            
+
     except HTTPException:
         raise
     except Exception as e:

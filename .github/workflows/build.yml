@@ -11,13 +11,23 @@ permissions:
 
 env:
   APP_NAME: KiroProxy
-  VERSION: "1.0.0"
 
 jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Get version from tag
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(grep -oP '__version__ = "\K[^"]+' kiro_proxy/__init__.py)
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -42,7 +52,7 @@ jobs:
       - name: Create packages
         run: |
           mkdir -p release
-          VERSION=${{ env.VERSION }}
+          VERSION=${{ steps.version.outputs.VERSION }}
           
           # Binary (standalone)
           cp dist/KiroProxy release/KiroProxy-${VERSION}-linux-x86_64
@@ -86,6 +96,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(grep -oP '__version__ = "\K[^"]+' kiro_proxy/__init__.py)
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -103,7 +125,7 @@ jobs:
       - name: Create packages
         shell: pwsh
         run: |
-          $VERSION = "${{ env.VERSION }}"
+          $VERSION = "${{ steps.version.outputs.VERSION }}"
           New-Item -ItemType Directory -Force -Path release
           
           # exe (standalone)
@@ -122,6 +144,17 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Get version from tag
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(grep -oP '__version__ = "\K[^"]+' kiro_proxy/__init__.py || echo "1.0.0")
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -147,7 +180,7 @@ jobs:
         
       - name: Create packages
         run: |
-          VERSION=${{ env.VERSION }}
+          VERSION=${{ steps.version.outputs.VERSION }}
           mkdir -p release
           
           # Binary (standalone)
@@ -169,6 +202,14 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     
     steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -180,20 +221,20 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          name: KiroProxy v${{ env.VERSION }}
+          name: KiroProxy v${{ steps.version.outputs.VERSION }}
           body: |
             ## Downloads
             
             | Platform | File | Description |
             |----------|------|-------------|
-            | **Linux** | `KiroProxy-${{ env.VERSION }}-linux-x86_64` | Standalone binary |
-            | | `KiroProxy-${{ env.VERSION }}-linux-x86_64.tar.gz` | Compressed archive |
-            | | `kiroproxy_${{ env.VERSION }}_amd64.deb` | Debian/Ubuntu package |
-            | | `kiroproxy-${{ env.VERSION }}-1.x86_64.rpm` | Fedora/RHEL/CentOS package |
-            | **Windows** | `KiroProxy-${{ env.VERSION }}-windows-x86_64.exe` | Standalone executable |
-            | | `KiroProxy-${{ env.VERSION }}-windows-x86_64.zip` | Compressed archive |
-            | **macOS** | `KiroProxy-${{ env.VERSION }}-macos-x86_64` | Standalone binary |
-            | | `KiroProxy-${{ env.VERSION }}-macos-x86_64.zip` | Compressed archive |
+            | **Linux** | `KiroProxy-${{ steps.version.outputs.VERSION }}-linux-x86_64` | Standalone binary |
+            | | `KiroProxy-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz` | Compressed archive |
+            | | `kiroproxy_${{ steps.version.outputs.VERSION }}_amd64.deb` | Debian/Ubuntu package |
+            | | `kiroproxy-${{ steps.version.outputs.VERSION }}-1.x86_64.rpm` | Fedora/RHEL/CentOS package |
+            | **Windows** | `KiroProxy-${{ steps.version.outputs.VERSION }}-windows-x86_64.exe` | Standalone executable |
+            | | `KiroProxy-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip` | Compressed archive |
+            | **macOS** | `KiroProxy-${{ steps.version.outputs.VERSION }}-macos-x86_64` | Standalone binary |
+            | | `KiroProxy-${{ steps.version.outputs.VERSION }}-macos-x86_64.zip` | Compressed archive |
           files: |
             artifacts/KiroProxy-Linux/*
             artifacts/KiroProxy-Windows/*

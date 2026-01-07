@@ -333,32 +333,37 @@ API Key: any
 模型: gpt-4o</code></pre>
   </div>
   <div class="card">
-    <h3>终端环境变量配置</h3>
-    <p style="color:var(--muted);font-size:0.875rem;margin-bottom:1rem">Claude Code 终端版需要设置环境变量才能使用代理</p>
+    <h3>Claude Code 终端配置</h3>
+    <p style="color:var(--muted);font-size:0.875rem;margin-bottom:1rem">Claude Code 终端版需要配置 <code>~/.claude/settings.json</code> 才能跳过登录使用代理</p>
     
     <h4 style="color:var(--muted);margin-bottom:0.5rem">临时生效（当前终端）</h4>
     <pre id="envTempCmd"><code>export ANTHROPIC_BASE_URL="<span class="pyUrl"></span>"
-export ANTHROPIC_API_KEY="sk-any"</code></pre>
+export ANTHROPIC_AUTH_TOKEN="sk-any"
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1</code></pre>
     <button class="copy-btn" onclick="copyEnvTemp()" style="margin-top:0.5rem">复制命令</button>
     
-    <h4 style="color:var(--muted);margin-top:1rem;margin-bottom:0.5rem">永久生效（自动检测 bash/zsh）</h4>
-    <pre id="envPermCmd"><code># 自动检测 shell 配置文件
-RC_FILE="$HOME/.bashrc"; [ -n "$ZSH_VERSION" ] && RC_FILE="$HOME/.zshrc"
-echo 'export ANTHROPIC_BASE_URL="<span class="pyUrl"></span>"' >> "$RC_FILE"
-echo 'export ANTHROPIC_API_KEY="sk-any"' >> "$RC_FILE"
-source "$RC_FILE"</code></pre>
+    <h4 style="color:var(--muted);margin-top:1rem;margin-bottom:0.5rem">永久生效（推荐，写入配置文件）</h4>
+    <pre id="envPermCmd"><code># 写入 Claude Code 配置文件
+mkdir -p ~/.claude
+cat > ~/.claude/settings.json << 'EOF'
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "<span class="pyUrl"></span>",
+    "ANTHROPIC_AUTH_TOKEN": "sk-any",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  }
+}
+EOF</code></pre>
     <button class="copy-btn" onclick="copyEnvPerm()" style="margin-top:0.5rem">复制命令</button>
     
     <h4 style="color:var(--muted);margin-top:1rem;margin-bottom:0.5rem">清除配置</h4>
-    <pre id="envClearCmd"><code># 自动检测 shell 配置文件
-RC_FILE="$HOME/.bashrc"; [ -n "$ZSH_VERSION" ] && RC_FILE="$HOME/.zshrc"
-sed -i '/ANTHROPIC_BASE_URL/d' "$RC_FILE"
-sed -i '/ANTHROPIC_API_KEY/d' "$RC_FILE"
-unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY</code></pre>
+    <pre id="envClearCmd"><code># 删除 Claude Code 配置
+rm -f ~/.claude/settings.json
+unset ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</code></pre>
     <button class="copy-btn" onclick="copyEnvClear()" style="margin-top:0.5rem">复制命令</button>
     
     <p style="color:var(--muted);font-size:0.75rem;margin-top:1rem">
-      💡 命令会自动检测你使用的是 bash 还是 zsh
+      💡 使用 <code>ANTHROPIC_AUTH_TOKEN</code> + <code>CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1</code> 可跳过登录
     </p>
   </div>
   <div class="card">
@@ -516,25 +521,31 @@ function copy(text){
 function copyEnvTemp(){
   const url=location.origin;
   copy(`export ANTHROPIC_BASE_URL="${url}"
-export ANTHROPIC_API_KEY="sk-any"`);
+export ANTHROPIC_AUTH_TOKEN="sk-any"
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`);
 }
 
 function copyEnvPerm(){
   const url=location.origin;
-  // 检测 shell 类型的命令
-  copy(`# 自动检测 shell 配置文件
-RC_FILE="$HOME/.bashrc"; [ -n "$ZSH_VERSION" ] && RC_FILE="$HOME/.zshrc"
-echo 'export ANTHROPIC_BASE_URL="${url}"' >> "$RC_FILE"
-echo 'export ANTHROPIC_API_KEY="sk-any"' >> "$RC_FILE"
-source "$RC_FILE"`);
+  copy(`# 写入 Claude Code 配置文件（推荐）
+mkdir -p ~/.claude
+cat > ~/.claude/settings.json << 'EOF'
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "${url}",
+    "ANTHROPIC_AUTH_TOKEN": "sk-any",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  }
+}
+EOF
+echo "配置完成，请重新打开终端运行 claude"`);
 }
 
 function copyEnvClear(){
-  copy(`# 自动检测 shell 配置文件
-RC_FILE="$HOME/.bashrc"; [ -n "$ZSH_VERSION" ] && RC_FILE="$HOME/.zshrc"
-sed -i '/ANTHROPIC_BASE_URL/d' "$RC_FILE"
-sed -i '/ANTHROPIC_API_KEY/d' "$RC_FILE"
-unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY`);
+  copy(`# 删除 Claude Code 配置
+rm -f ~/.claude/settings.json
+unset ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC
+echo "配置已清除"`);
 }
 
 function formatUptime(s){

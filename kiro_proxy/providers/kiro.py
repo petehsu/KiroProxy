@@ -80,6 +80,10 @@ class KiroProvider(BaseProvider):
         """构建 Kiro API 请求体"""
         conversation_id = str(uuid.uuid4())
         
+        # 确保 content 不为空
+        if not user_content:
+            user_content = "Continue"
+        
         user_input_message = {
             "content": user_content,
             "modelId": model,

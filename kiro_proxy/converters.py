@@ -316,14 +316,14 @@ def convert_anthropic_messages_to_kiro(messages: List[dict], system="") -> Tuple
         
         if role == "user":
             if system_text and not history:
-                content = f"{system_text}\n\n{content}"
+                content = f"{system_text}\n\n{content}" if content else system_text
             
             if is_last:
-                user_content = content
+                user_content = content if content else "Continue"
             else:
                 history.append({
                     "userInputMessage": {
-                        "content": content,
+                        "content": content if content else "Continue",
                         "modelId": "claude-sonnet-4",
                         "origin": "AI_EDITOR"
                     }

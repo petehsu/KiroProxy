@@ -123,6 +123,9 @@ async def handle_messages(request: Request):
     stream = body.get("stream", False)
     tools = body.get("tools", [])
     
+    # 调试：打印原始请求的关键信息
+    print(f"[Anthropic] Request: model={body.get('model')} -> {model}, messages={len(messages)}, stream={stream}, tools={len(tools)}")
+    
     if not messages:
         raise HTTPException(400, "messages required")
     
@@ -271,6 +274,17 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                                     if 'currentMessage' in cs:
                                         cm = cs['currentMessage']
                                         print(f"  currentMessage keys: {list(cm.keys())}")
+                                        if 'userInputMessage' in cm:
+                                            uim = cm['userInputMessage']
+                                            print(f"  userInputMessage keys: {list(uim.keys())}")
+                                            content = uim.get('content', '')
+                                            print(f"  content (first 200 chars): {str(content)[:200]}")
+                                    if 'history' in cs:
+                                        hist = cs['history']
+                                        print(f"  history count: {len(hist) if hist else 0}")
+                                        if hist:
+                                            for i, h in enumerate(hist[:3]):
+                                                print(f"    history[{i}] keys: {list(h.keys()) if isinstance(h, dict) else type(h)}")
                             print(f"======================")
                             
                             # 使用统一的错误处理

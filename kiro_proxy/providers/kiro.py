@@ -84,17 +84,20 @@ class KiroProvider(BaseProvider):
             "content": user_content,
             "modelId": model,
             "origin": "AI_EDITOR",
-            "userInputMessageContext": {}
         }
         
         if images:
             user_input_message["images"] = images
         
+        # 只有在有 tools 或 tool_results 时才添加 userInputMessageContext
+        context = {}
         if tools:
-            user_input_message["userInputMessageContext"]["tools"] = tools
-        
+            context["tools"] = tools
         if tool_results:
-            user_input_message["userInputMessageContext"]["toolResults"] = tool_results
+            context["toolResults"] = tool_results
+        
+        if context:
+            user_input_message["userInputMessageContext"] = context
         
         return {
             "conversationState": {

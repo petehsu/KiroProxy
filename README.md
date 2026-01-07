@@ -33,7 +33,13 @@
 - **会话粘性** - 同一会话 60 秒内使用同一账号，保持上下文
 - **Web UI** - 简洁的管理界面，支持对话测试、监控、日志查看
 
-### v1.3.0 新功能
+### v1.4.0 新功能
+- **Token 预刷新** - 后台每 5 分钟检查，提前 15 分钟自动刷新
+- **健康检查** - 每 10 分钟检测账号可用性，自动标记状态
+- **请求统计增强** - 按账号/模型统计，24 小时趋势
+- **请求重试机制** - 网络错误/5xx 自动重试，指数退避
+
+### v1.3.0 功能
 - **Token 自动刷新** - 检测过期自动刷新，支持 Social 认证
 - **动态 Machine ID** - 每个账号独立指纹，基于凭证 + 时间因子生成
 - **配额管理** - 429 自动检测、冷却 (300s)、自动恢复
@@ -145,6 +151,8 @@ Endpoint: http://localhost:8080/v1
 | `/api/accounts/refresh-all` | POST | 刷新所有即将过期的 Token |
 | `/api/quota` | GET | 获取配额状态 |
 | `/api/stats` | GET | 获取统计信息 |
+| `/api/stats/detailed` | GET | 获取详细统计（按账号/模型） |
+| `/api/health-check` | POST | 手动触发健康检查 |
 | `/api/logs` | GET | 获取请求日志 |
 
 ## 项目结构
@@ -158,7 +166,10 @@ kiro_proxy/
 ├── core/                      # 核心模块
 │   ├── account.py            # 账号管理
 │   ├── state.py              # 全局状态
-│   └── persistence.py        # 配置持久化
+│   ├── persistence.py        # 配置持久化
+│   ├── scheduler.py          # 后台任务调度
+│   ├── stats.py              # 请求统计
+│   └── retry.py              # 重试机制
 │
 ├── credential/                # 凭证管理
 │   ├── types.py              # KiroCredentials

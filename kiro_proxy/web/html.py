@@ -341,22 +341,24 @@ API Key: any
 export ANTHROPIC_API_KEY="sk-any"</code></pre>
     <button class="copy-btn" onclick="copyEnvTemp()" style="margin-top:0.5rem">复制命令</button>
     
-    <h4 style="color:var(--muted);margin-top:1rem;margin-bottom:0.5rem">永久生效（写入 ~/.bashrc）</h4>
-    <pre id="envPermCmd"><code>echo 'export ANTHROPIC_BASE_URL="<span class="pyUrl"></span>"' >> ~/.bashrc
-echo 'export ANTHROPIC_API_KEY="sk-any"' >> ~/.bashrc
-source ~/.bashrc</code></pre>
+    <h4 style="color:var(--muted);margin-top:1rem;margin-bottom:0.5rem">永久生效（自动检测 bash/zsh）</h4>
+    <pre id="envPermCmd"><code># 自动检测 shell 配置文件
+RC_FILE="$HOME/.bashrc"; [ -n "$ZSH_VERSION" ] && RC_FILE="$HOME/.zshrc"
+echo 'export ANTHROPIC_BASE_URL="<span class="pyUrl"></span>"' >> "$RC_FILE"
+echo 'export ANTHROPIC_API_KEY="sk-any"' >> "$RC_FILE"
+source "$RC_FILE"</code></pre>
     <button class="copy-btn" onclick="copyEnvPerm()" style="margin-top:0.5rem">复制命令</button>
     
     <h4 style="color:var(--muted);margin-top:1rem;margin-bottom:0.5rem">清除配置</h4>
-    <pre id="envClearCmd"><code># 从 ~/.bashrc 中删除相关行
-sed -i '/ANTHROPIC_BASE_URL/d' ~/.bashrc
-sed -i '/ANTHROPIC_API_KEY/d' ~/.bashrc
-# 清除当前终端变量
+    <pre id="envClearCmd"><code># 自动检测 shell 配置文件
+RC_FILE="$HOME/.bashrc"; [ -n "$ZSH_VERSION" ] && RC_FILE="$HOME/.zshrc"
+sed -i '/ANTHROPIC_BASE_URL/d' "$RC_FILE"
+sed -i '/ANTHROPIC_API_KEY/d' "$RC_FILE"
 unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY</code></pre>
     <button class="copy-btn" onclick="copyEnvClear()" style="margin-top:0.5rem">复制命令</button>
     
     <p style="color:var(--muted);font-size:0.75rem;margin-top:1rem">
-      💡 macOS/zsh 用户请将 <code>~/.bashrc</code> 替换为 <code>~/.zshrc</code>
+      💡 命令会自动检测你使用的是 bash 还是 zsh
     </p>
   </div>
   <div class="card">
@@ -513,16 +515,26 @@ function copy(text){
 
 function copyEnvTemp(){
   const url=location.origin;
-  copy(`export ANTHROPIC_BASE_URL="${url}"\\nexport ANTHROPIC_API_KEY="sk-any"`);
+  copy(`export ANTHROPIC_BASE_URL="${url}"
+export ANTHROPIC_API_KEY="sk-any"`);
 }
 
 function copyEnvPerm(){
   const url=location.origin;
-  copy(`echo 'export ANTHROPIC_BASE_URL="${url}"' >> ~/.bashrc\\necho 'export ANTHROPIC_API_KEY="sk-any"' >> ~/.bashrc\\nsource ~/.bashrc`);
+  // 检测 shell 类型的命令
+  copy(`# 自动检测 shell 配置文件
+RC_FILE="$HOME/.bashrc"; [ -n "$ZSH_VERSION" ] && RC_FILE="$HOME/.zshrc"
+echo 'export ANTHROPIC_BASE_URL="${url}"' >> "$RC_FILE"
+echo 'export ANTHROPIC_API_KEY="sk-any"' >> "$RC_FILE"
+source "$RC_FILE"`);
 }
 
 function copyEnvClear(){
-  copy(`sed -i '/ANTHROPIC_BASE_URL/d' ~/.bashrc\\nsed -i '/ANTHROPIC_API_KEY/d' ~/.bashrc\\nunset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY`);
+  copy(`# 自动检测 shell 配置文件
+RC_FILE="$HOME/.bashrc"; [ -n "$ZSH_VERSION" ] && RC_FILE="$HOME/.zshrc"
+sed -i '/ANTHROPIC_BASE_URL/d' "$RC_FILE"
+sed -i '/ANTHROPIC_API_KEY/d' "$RC_FILE"
+unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY`);
 }
 
 function formatUptime(s){

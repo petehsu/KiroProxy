@@ -430,19 +430,19 @@ HTML_SETTINGS = '''
     <div style="margin-bottom:1rem">
       <p style="font-weight:500;margin-bottom:0.5rem">启用的策略（可多选）：</p>
       <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;cursor:pointer">
-        <input type="checkbox" id="strategyAutoTruncate" onchange="updateHistoryConfig()">
+        <input type="checkbox" id="strategyAutoTruncate" onchange="onStrategyChange('auto_truncate', this.checked)">
         <span><strong>自动截断</strong> - 发送前优先保留最新上下文并摘要前文</span>
       </label>
       <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;cursor:pointer">
-        <input type="checkbox" id="strategySmartSummary" onchange="updateHistoryConfig()">
+        <input type="checkbox" id="strategySmartSummary" onchange="onStrategyChange('smart_summary', this.checked)">
         <span><strong>智能摘要</strong> - 用 AI 生成早期对话摘要（需额外 API 调用）</span>
       </label>
       <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;cursor:pointer">
-        <input type="checkbox" id="strategyErrorRetry" onchange="updateHistoryConfig()">
-        <span><strong>错误重试</strong> - 遇到长度错误时截断后重试</span>
+        <input type="checkbox" id="strategyErrorRetry" onchange="onStrategyChange('error_retry', this.checked)">
+        <span><strong>错误重试</strong> - 遇到长度错误时截断后重试 <span style="color:var(--warn);font-size:0.75rem">（推荐）</span></span>
       </label>
       <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;cursor:pointer">
-        <input type="checkbox" id="strategyPreEstimate" onchange="updateHistoryConfig()">
+        <input type="checkbox" id="strategyPreEstimate" onchange="onStrategyChange('pre_estimate', this.checked)">
         <span><strong>预估检测</strong> - 发送前预估 token 数量</span>
       </label>
     </div>
@@ -1318,17 +1318,91 @@ async function exportFlows(){
 
 JS_SETTINGS = '''
 // 设置页面
+
+// 策略警告信息
+const strategyWarnings = {
+  error_retry: {
+    title: '⚠️ 关闭"错误重试"策略',
+    message: `关闭此策略后，当对话历史过长导致 Kiro API 返回错误时，代理将不会自动截断重试。
+
+<b>可能遇到的问题：</b>
+• 错误信息：CONTENT_LENGTH_EXCEEDS_THRESHOLD 或 "Input is too long"
+• HTTP 状态码：400 Bad Request
+• 客户端显示：请求失败、对话中断
+
+<b>为什么会发生：</b>
+Kiro API 对输入长度有限制，长对话会超过这个限制。
+
+<b>手动处理方法：</b>
+• Claude Code: 输入 /clear 清空对话历史
+• Codex CLI: 开始新对话
+• 其他客户端: 清空或缩短对话历史
+
+<b>建议：</b>保持此策略启用，除非你有特殊需求。`
+  },
+  auto_truncate: {
+    title: '⚠️ 关闭"自动截断"策略',
+    message: `关闭此策略后，代理将不会在发送前自动截断过长的历史消息。
+
+<b>可能遇到的问题：</b>
+• 请求可能因历史过长而失败
+• 需要依赖"错误重试"策略来处理
+
+<b>建议：</b>如果你启用了"错误重试"，可以关闭此策略。`
+  },
+  smart_summary: {
+    title: '关闭"智能摘要"策略',
+    message: `关闭此策略后，代理将不会用 AI 生成早期对话摘要。
+
+<b>影响：</b>
+• 截断时会丢失早期对话的上下文
+• 不会产生额外的 API 调用
+
+<b>建议：</b>如果你不需要保留早期对话上下文，可以关闭。`
+  },
+  pre_estimate: {
+    title: '关闭"预估检测"策略',
+    message: `关闭此策略后，代理将不会在发送前预估 token 数量。
+
+<b>影响：</b>
+• 可能会发送超长请求然后被拒绝
+• 需要依赖"错误重试"策略来处理
+
+<b>建议：</b>如果你启用了"错误重试"，可以关闭此策略。`
+  }
+};
+
+function onStrategyChange(strategy, checked) {
+  if (!checked && strategyWarnings[strategy]) {
+    const warning = strategyWarnings[strategy];
+    const confirmed = confirm(warning.title + '\\n\\n' + warning.message.replace(/<[^>]+>/g, ''));
+    if (!confirmed) {
+      // 用户取消，恢复勾选
+      if (strategy === 'error_retry') $('#strategyErrorRetry').checked = true;
+      else if (strategy === 'auto_truncate') $('#strategyAutoTruncate').checked = true;
+      else if (strategy === 'smart_summary') $('#strategySmartSummary').checked = true;
+      else if (strategy === 'pre_estimate') $('#strategyPreEstimate').checked = true;
+      return;
+    }
+  }
+  // 显示/隐藏摘要选项
+  $('#summaryOptions').style.display = $('#strategySmartSummary').checked ? 'block' : 'none';
+  updateHistoryConfig();
+}
+
 async function loadHistoryConfig(){
   try{
     const r=await fetch('/api/settings/history');
     const d=await r.json();
-    $('#strategyAutoTruncate').checked=d.strategies?.includes('auto_truncate')||false;
-    $('#strategySmartSummary').checked=d.strategies?.includes('smart_summary')||false;
-    $('#strategyErrorRetry').checked=d.strategies?.includes('error_retry')||false;
-    $('#strategyPreEstimate').checked=d.strategies?.includes('pre_estimate')||false;
+    // 默认启用错误重试
+    const strategies = d.strategies || ['error_retry'];
+    $('#strategyAutoTruncate').checked=strategies.includes('auto_truncate');
+    $('#strategySmartSummary').checked=strategies.includes('smart_summary');
+    $('#strategyErrorRetry').checked=strategies.includes('error_retry');
+    $('#strategyPreEstimate').checked=strategies.includes('pre_estimate');
     $('#maxMessages').value=d.max_messages||30;
     $('#maxChars').value=d.max_chars||150000;
-    $('#retryMaxMessages').value=d.retry_max_messages||15;
+    $('#retryMaxMessages').value=d.retry_max_messages||20;
     $('#maxRetries').value=d.max_retries||2;
     $('#summaryKeepRecent').value=d.summary_keep_recent||10;
     $('#summaryThreshold').value=d.summary_threshold||100000;

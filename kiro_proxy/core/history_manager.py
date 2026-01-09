@@ -60,8 +60,8 @@ class TruncateStrategy(str, Enum):
 
 
 # 自动管理的阈值常量
-AUTO_COMPRESS_THRESHOLD = 120000   # 触发自动压缩的字符数阈值
-SAFE_CHAR_LIMIT = 100000           # 压缩后的目标字符数
+AUTO_COMPRESS_THRESHOLD = 150000   # 触发自动压缩的字符数阈值
+SAFE_CHAR_LIMIT = 120000           # 压缩后的目标字符数
 MIN_KEEP_MESSAGES = 6              # 最少保留的最近消息数
 MAX_KEEP_MESSAGES = 20             # 最多保留的最近消息数
 SUMMARY_MAX_LENGTH = 3000          # 摘要最大长度

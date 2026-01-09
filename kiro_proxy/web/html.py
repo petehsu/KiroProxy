@@ -2125,7 +2125,7 @@ function renderAccountCardCompact(account) {
           <div class="account-card-quota-fill" style="width:${usedPercent}%;background:${barColor}"></div>
         </div>
         <div class="account-card-quota-text">
-          <span>剩余 ${quota.balance.toFixed(1)}</span>
+          <span>${quota.current_usage.toFixed(1)} / ${quota.usage_limit.toFixed(1)}</span>
           <span>${usedPercent.toFixed(0)}%</span>
         </div>
       </div>

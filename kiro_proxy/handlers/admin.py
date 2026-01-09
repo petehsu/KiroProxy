@@ -18,11 +18,12 @@ from ..auth import start_social_auth, exchange_social_auth_token, cancel_social_
 async def get_status():
     """服务状态"""
     try:
-        with open(TOKEN_PATH) as f:
-            data = json.load(f)
+        # 检查是否有可用账号
+        available_count = len([a for a in state.accounts if a.enabled and a.is_available()])
         return {
-            "ok": True,
-            "expires": data.get("expiresAt"),
+            "ok": available_count > 0,
+            "available_accounts": available_count,
+            "total_accounts": len(state.accounts),
             "stats": state.get_stats()
         }
     except Exception as e:

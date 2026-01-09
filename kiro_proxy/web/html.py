@@ -8,7 +8,7 @@ CSS_BASE = '''
   :root { --bg: #0a0a0a; --card: #141414; --border: #262626; --text: #fafafa; --muted: #a3a3a3; --accent: #fff; }
 }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
-.container { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem 1rem; }
 '''
 
 CSS_LAYOUT = '''
@@ -195,9 +195,9 @@ CSS_UI_COMPONENTS = '''
 .account-stat-value { font-weight: 600; font-size: 0.9rem; }
 .account-stat-label { font-size: 0.7rem; color: var(--muted); }
 
-/* 账号网格布局 */
-.accounts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; margin-top: 1rem; }
-.account-card-compact { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; transition: all 0.2s; }
+/* 账号网格布局 - 动态自适应 */
+.accounts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+.account-card-compact { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.875rem; transition: all 0.2s; }
 .account-card-compact:hover { border-color: var(--accent); }
 .account-card-compact.priority { border-color: var(--info); border-width: 2px; }
 .account-card-compact.low-balance { border-color: var(--warn); }
@@ -227,7 +227,7 @@ CSS_UI_COMPONENTS = '''
 /* 全局进度条 - 批量刷新操作进度显示 */
 .global-progress-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 1200; background: var(--card); border-bottom: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.1); transform: translateY(-100%); transition: transform 0.3s ease; }
 .global-progress-bar.active { transform: translateY(0); }
-.global-progress-bar-inner { max-width: 1100px; margin: 0 auto; padding: 0.75rem 1rem; }
+.global-progress-bar-inner { max-width: 1400px; margin: 0 auto; padding: 0.75rem 1rem; }
 .global-progress-bar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
 .global-progress-bar-title { font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
 .global-progress-bar-title .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }

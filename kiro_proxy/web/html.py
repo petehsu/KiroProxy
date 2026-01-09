@@ -1016,9 +1016,7 @@ async function queryUsage(id){
           <div style="background:${barColor};height:100%;width:${pct}%;transition:width 0.3s"></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.5rem;font-size:0.8rem">
-          <div><span style="color:var(--muted)">已用:</span> ${u.current_usage.toFixed(2)}</div>
-          <div><span style="color:var(--muted)">总额:</span> ${u.usage_limit.toFixed(2)}</div>
-          <div><span style="color:var(--muted)">余额:</span> ${u.balance.toFixed(2)}</div>
+          <div><span style="color:var(--muted)">已用/总额:</span> ${u.current_usage.toFixed(2)} / ${u.usage_limit.toFixed(2)}</div>
           <div><span style="color:var(--muted)">使用率:</span> ${pct}%</div>
         </div>
       `;
@@ -1913,8 +1911,8 @@ function renderAccountCard(account) {
     quotaSection = `
       <div class="account-quota-section">
         <div class="quota-header">
-          <span>剩余额度</span>
-          <span>${quota.balance.toFixed(1)} / ${quota.usage_limit.toFixed(1)}</span>
+          <span>已用/总额</span>
+          <span>${quota.current_usage.toFixed(1)} / ${quota.usage_limit.toFixed(1)}</span>
         </div>
         ${renderProgressBar(quota.current_usage, quota.usage_limit, {
           color: quota.is_low_balance ? 'error' : usedPercent > 60 ? 'warning' : 'success',

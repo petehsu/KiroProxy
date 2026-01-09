@@ -167,9 +167,15 @@ async def handle_generate_content(model_name: str, request: Request):
                         current_account.status = CredentialStatus.SUSPENDED
                         print(f"[Gemini] 账号 {current_account.id} 已被禁用 (封禁)")
                     
-                    # 配额超限 - 标记冷却
-                    if error.type == ErrorType.RATE_LIMITED:
+                    # 配额超限 (429) - 标记冷却
+                    elif error.type == ErrorType.RATE_LIMITED:
                         current_account.mark_quota_exceeded(error_msg[:100])
+                    
+                    # 其他错误（非 429、非内容过长）- 异步检查额度
+                    elif error.type != ErrorType.CONTENT_TOO_LONG:
+                        from .anthropic import _check_and_disable_if_exhausted
+                        import asyncio
+                        asyncio.create_task(_check_and_disable_if_exhausted(current_account))
                     
                     # 尝试切换账号
                     if error.should_switch_account:

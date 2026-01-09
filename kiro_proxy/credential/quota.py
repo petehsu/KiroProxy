@@ -27,7 +27,7 @@ class QuotaManager:
         "capacity", "overloaded", "try again later"
     ]
     
-    QUOTA_STATUS_CODES = {429, 503, 529}
+    QUOTA_STATUS_CODES = {402, 429, 503, 529}
     
     def __init__(self, cooldown_seconds: int = 300):
         self.cooldown_seconds = cooldown_seconds

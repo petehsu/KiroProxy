@@ -100,11 +100,11 @@ class QuotaScheduler:
             print("[QuotaScheduler] 没有账号需要刷新")
             return {}
         
-        enabled_accounts = [acc for acc in accounts if acc.enabled]
-        print(f"[QuotaScheduler] 开始刷新 {len(enabled_accounts)} 个账号的额度...")
+        # 刷新所有账号（包括禁用的，以便检查是否可以解禁）
+        print(f"[QuotaScheduler] 开始刷新 {len(accounts)} 个账号的额度...")
         
         # 并发获取所有账号额度
-        tasks = [self._refresh_account_internal(acc) for acc in enabled_accounts]
+        tasks = [self._refresh_account_internal(acc) for acc in accounts]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         # 统计结果
@@ -112,7 +112,7 @@ class QuotaScheduler:
         fail_count = 0
         result_dict = {}
         
-        for acc, result in zip(enabled_accounts, results):
+        for acc, result in zip(accounts, results):
             if isinstance(result, Exception):
                 result_dict[acc.id] = False
                 fail_count += 1
@@ -128,8 +128,19 @@ class QuotaScheduler:
         # 保存缓存
         await self.quota_cache.save_to_file_async()
         
+        # 保存账号配置（因为可能有启用/禁用状态变化）
+        self._save_accounts_config()
+        
         print(f"[QuotaScheduler] 额度刷新完成: 成功 {success_count}, 失败 {fail_count}")
         return result_dict
+    
+    def _save_accounts_config(self):
+        """保存账号配置"""
+        try:
+            from .state import state
+            state._save_accounts()
+        except Exception as e:
+            print(f"[QuotaScheduler] 保存账号配置失败: {e}")
     
     async def refresh_account(self, account_id: str) -> bool:
         """刷新单个账号额度
@@ -151,6 +162,7 @@ class QuotaScheduler:
         
         if success:
             await self.quota_cache.save_to_file_async()
+            self._save_accounts_config()
         
         return success
     
@@ -169,6 +181,18 @@ class QuotaScheduler:
             if success:
                 quota = CachedQuota.from_usage_info(account.id, result)
                 self.quota_cache.set(account.id, quota)
+                
+                # 额度为 0 时自动禁用账号
+                if quota.is_exhausted:
+                    if account.enabled:
+                        account.enabled = False
+                        print(f"[QuotaScheduler] 账号 {account.id} ({account.name}) 额度已用尽，自动禁用")
+                else:
+                    # 有额度时自动解禁账号
+                    if not account.enabled:
+                        account.enabled = True
+                        print(f"[QuotaScheduler] 账号 {account.id} ({account.name}) 有可用额度，自动启用")
+                
                 return True
             else:
                 error_msg = result.get("error", "Unknown error") if isinstance(result, dict) else str(result)

@@ -64,7 +64,18 @@ def classify_error(status_code: int, error_text: str) -> KiroError:
             should_switch_account=True,
         )
     
-    # 2. 配额超限检测
+    # 2. 402 Payment Required - 额度用尽
+    if status_code == 402 or "payment required" in error_lower or "insufficient" in error_lower:
+        return KiroError(
+            type=ErrorType.RATE_LIMITED,
+            status_code=status_code,
+            message=error_text,
+            user_message="账号额度已用尽，已切换到其他账号",
+            should_switch_account=True,
+            cooldown_seconds=3600,  # 额度用尽冷却 1 小时
+        )
+    
+    # 3. 配额超限检测 (429)
     quota_keywords = ["rate limit", "quota", "too many requests", "throttl", "capacity"]
     if status_code == 429 or any(kw in error_lower for kw in quota_keywords):
         return KiroError(
@@ -76,7 +87,7 @@ def classify_error(status_code: int, error_text: str) -> KiroError:
             cooldown_seconds=300,
         )
     
-    # 3. 内容过长检测
+    # 4. 内容过长检测
     if "content_length_exceeds_threshold" in error_lower or (
         "too long" in error_lower and ("input" in error_lower or "content" in error_lower)
     ):
@@ -88,7 +99,7 @@ def classify_error(status_code: int, error_text: str) -> KiroError:
             should_retry=True,
         )
     
-    # 4. 认证失败检测
+    # 5. 认证失败检测
     if status_code == 401 or "unauthorized" in error_lower or "invalid token" in error_lower:
         return KiroError(
             type=ErrorType.AUTH_FAILED,
@@ -98,7 +109,7 @@ def classify_error(status_code: int, error_text: str) -> KiroError:
             should_switch_account=True,
         )
     
-    # 5. 模型不可用检测
+    # 6. 模型不可用检测
     if "model_temporarily_unavailable" in error_lower or "unexpectedly high load" in error_lower:
         return KiroError(
             type=ErrorType.MODEL_UNAVAILABLE,
@@ -108,7 +119,7 @@ def classify_error(status_code: int, error_text: str) -> KiroError:
             should_retry=True,
         )
     
-    # 6. 服务不可用检测
+    # 7. 服务不可用检测
     if status_code in (502, 503, 504) or "service unavailable" in error_lower:
         return KiroError(
             type=ErrorType.SERVICE_UNAVAILABLE,
@@ -118,7 +129,7 @@ def classify_error(status_code: int, error_text: str) -> KiroError:
             should_retry=True,
         )
     
-    # 7. 未知错误
+    # 8. 未知错误
     return KiroError(
         type=ErrorType.UNKNOWN,
         status_code=status_code,

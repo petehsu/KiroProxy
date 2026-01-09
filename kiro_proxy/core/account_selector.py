@@ -131,100 +131,86 @@ class AccountSelector:
     
     def set_priority_accounts(self, account_ids: List[str], 
                               valid_account_ids: Optional[Set[str]] = None) -> tuple:
-        """设置优先账号列表
+        """设置优先账号（只能设置一个）
         
         Args:
-            account_ids: 优先账号ID列表
+            account_ids: 优先账号ID列表（只取第一个）
             valid_account_ids: 有效账号ID集合（用于验证）
             
         Returns:
             (success, message)
         """
         with self._lock:
-            # 验证账号是否存在
-            if valid_account_ids:
-                invalid_ids = [aid for aid in account_ids if aid not in valid_account_ids]
-                if invalid_ids:
-                    return False, f"账号不存在: {', '.join(invalid_ids)}"
+            # 只取第一个账号
+            if not account_ids:
+                self._priority_accounts = []
+                self._save_priority_config()
+                return True, "已清除优先账号"
             
-            self._priority_accounts = list(account_ids)
-            self._save_priority_config()
-            return True, f"已设置 {len(account_ids)} 个优先账号"
-    
-    def add_priority_account(self, account_id: str, 
-                             position: int = -1,
-                             valid_account_ids: Optional[Set[str]] = None) -> tuple:
-        """添加优先账号
-        
-        Args:
-            account_id: 账号ID
-            position: 插入位置，-1 表示末尾
-            valid_account_ids: 有效账号ID集合（用于验证）
+            account_id = account_ids[0]
             
-        Returns:
-            (success, message)
-        """
-        with self._lock:
             # 验证账号是否存在
             if valid_account_ids and account_id not in valid_account_ids:
                 return False, f"账号不存在: {account_id}"
             
-            # 检查是否已存在
-            if account_id in self._priority_accounts:
-                return False, f"账号 {account_id} 已是优先账号"
-            
-            if position < 0 or position >= len(self._priority_accounts):
-                self._priority_accounts.append(account_id)
-            else:
-                self._priority_accounts.insert(position, account_id)
-            
+            self._priority_accounts = [account_id]
             self._save_priority_config()
-            return True, f"已添加优先账号: {account_id}"
+            return True, f"已设置优先账号: {account_id}"
     
-    def remove_priority_account(self, account_id: str) -> tuple:
-        """移除优先账号
+    def set_priority_account(self, account_id: Optional[str],
+                             valid_account_ids: Optional[Set[str]] = None) -> tuple:
+        """设置优先账号（单个）
+        
+        Args:
+            account_id: 账号ID，None 表示清除
+            valid_account_ids: 有效账号ID集合（用于验证）
+            
+        Returns:
+            (success, message)
+        """
+        if account_id is None:
+            return self.set_priority_accounts([], valid_account_ids)
+        return self.set_priority_accounts([account_id], valid_account_ids)
+    
+    def add_priority_account(self, account_id: str, 
+                             position: int = -1,
+                             valid_account_ids: Optional[Set[str]] = None) -> tuple:
+        """设置优先账号（替换现有的）
         
         Args:
             account_id: 账号ID
+            position: 忽略（只支持单个优先账号）
+            valid_account_ids: 有效账号ID集合（用于验证）
             
         Returns:
             (success, message)
         """
-        with self._lock:
-            if account_id not in self._priority_accounts:
-                return False, f"账号 {account_id} 不是优先账号"
-            
-            self._priority_accounts.remove(account_id)
-            self._save_priority_config()
-            return True, f"已移除优先账号: {account_id}"
+        return self.set_priority_account(account_id, valid_account_ids)
     
-    def reorder_priority(self, account_ids: List[str]) -> tuple:
-        """重新排序优先账号
+    def remove_priority_account(self, account_id: str = None) -> tuple:
+        """移除优先账号
         
         Args:
-            account_ids: 新的优先账号顺序
+            account_id: 账号ID（可选，不传则清除所有）
             
         Returns:
             (success, message)
         """
         with self._lock:
-            # 验证所有账号都在当前优先列表中
-            current_set = set(self._priority_accounts)
-            new_set = set(account_ids)
+            if not self._priority_accounts:
+                return False, "没有设置优先账号"
             
-            if current_set != new_set:
-                missing = current_set - new_set
-                extra = new_set - current_set
-                errors = []
-                if missing:
-                    errors.append(f"缺少账号: {', '.join(missing)}")
-                if extra:
-                    errors.append(f"多余账号: {', '.join(extra)}")
-                return False, "; ".join(errors)
+            if account_id and account_id not in self._priority_accounts:
+                return False, f"账号 {account_id} 不是优先账号"
             
-            self._priority_accounts = list(account_ids)
+            self._priority_accounts = []
             self._save_priority_config()
-            return True, "优先账号顺序已更新"
+            return True, "已清除优先账号"
+    
+    def get_priority_account(self) -> Optional[str]:
+        """获取优先账号（单个）"""
+        with self._lock:
+            return self._priority_accounts[0] if self._priority_accounts else None
     
     def get_priority_accounts(self) -> List[str]:
         """获取优先账号列表"""

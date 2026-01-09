@@ -78,6 +78,33 @@ def _count_tokens_from_messages(messages, system: str = "") -> int:
     return total
 
 
+async def _check_and_disable_if_exhausted(account):
+    """检查账号额度，如果为 0 则禁用账号
+    
+    Args:
+        account: 账号对象
+    """
+    if not account:
+        return
+    
+    try:
+        from ..core.usage import get_account_usage
+        from ..core.quota_cache import CachedQuota, get_quota_cache
+        
+        success, result = await get_account_usage(account)
+        if success:
+            quota = CachedQuota.from_usage_info(account.id, result)
+            get_quota_cache().set(account.id, quota)
+            
+            if quota.is_exhausted:
+                account.enabled = False
+                from ..core.state import state
+                state._save_accounts()
+                print(f"[Account] 账号 {account.id} ({account.name}) 额度已用尽，自动禁用")
+    except Exception as e:
+        print(f"[Account] 检查账号 {account.id} 额度失败: {e}")
+
+
 def _handle_kiro_error(status_code: int, error_text: str, account):
     """处理 Kiro API 错误，返回 (http_status, error_type, error_message)"""
     error = classify_error(status_code, error_text)
@@ -92,9 +119,14 @@ def _handle_kiro_error(status_code: int, error_text: str, account):
         account.status = CredentialStatus.SUSPENDED
         print(f"[Account] 账号 {account.id} 已被禁用 (封禁)")
     
-    # 配额超限 - 标记冷却
+    # 配额超限 (429) - 标记冷却，不检查额度
     elif error.type == ErrorType.RATE_LIMITED and account:
         account.mark_quota_exceeded(error.message[:100])
+    
+    # 其他错误（非 429、非内容过长）- 异步检查额度
+    elif error.type not in (ErrorType.RATE_LIMITED, ErrorType.CONTENT_TOO_LONG) and account:
+        import asyncio
+        asyncio.create_task(_check_and_disable_if_exhausted(account))
     
     # 映射错误类型
     error_type_map = {

@@ -661,95 +661,49 @@ HTML_SETTINGS = '''
       <button class="secondary small" onclick="resetHistoryConfig()">还原默认</button>
     </h3>
     <p style="color:var(--muted);font-size:0.875rem;margin-bottom:1rem">
-      处理 Kiro API 的输入长度限制（CONTENT_LENGTH_EXCEEDS_THRESHOLD 错误）
+      自动处理 Kiro API 的输入长度限制，超限时智能压缩而非强硬截断
     </p>
     
-    <div style="margin-bottom:1rem">
-      <p style="font-weight:500;margin-bottom:0.5rem">启用的策略（可多选）：</p>
-      <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;cursor:pointer">
-        <input type="checkbox" id="strategyAutoTruncate" onchange="onStrategyChange('auto_truncate', this.checked)">
-        <span><strong>自动截断</strong> - 发送前优先保留最新上下文并摘要前文</span>
-      </label>
-      <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;cursor:pointer">
-        <input type="checkbox" id="strategySmartSummary" onchange="onStrategyChange('smart_summary', this.checked)">
-        <span><strong>智能摘要</strong> - 用 AI 生成早期对话摘要（需额外 API 调用）</span>
-      </label>
-      <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;cursor:pointer">
-        <input type="checkbox" id="strategyErrorRetry" onchange="onStrategyChange('error_retry', this.checked)">
-        <span><strong>错误重试</strong> - 遇到长度错误时截断后重试 <span style="color:var(--warn);font-size:0.75rem">（推荐）</span></span>
-      </label>
-      <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;cursor:pointer">
-        <input type="checkbox" id="strategyPreEstimate" onchange="onStrategyChange('pre_estimate', this.checked)">
-        <span><strong>预估检测</strong> - 发送前预估 token 数量</span>
-      </label>
+    <div style="padding:1rem;background:linear-gradient(135deg,rgba(34,197,94,0.1),rgba(59,130,246,0.1));border-radius:8px;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
+        <span style="font-size:1.25rem">🤖</span>
+        <strong style="color:var(--success)">智能压缩模式</strong>
+        <span style="background:var(--success);color:white;padding:0.125rem 0.5rem;border-radius:4px;font-size:0.75rem">自动</span>
+      </div>
+      <p style="font-size:0.875rem;color:var(--muted);margin:0">
+        当对话历史超过 120K 字符时，自动生成早期对话摘要并保留最近上下文，无需手动配置参数
+      </p>
     </div>
     
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem">
       <div>
-        <label style="display:block;font-size:0.875rem;color:var(--muted);margin-bottom:0.25rem">最大消息数</label>
-        <input type="number" id="maxMessages" value="30" min="5" max="100" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)" onchange="updateHistoryConfig()">
-      </div>
-      <div>
-        <label style="display:block;font-size:0.875rem;color:var(--muted);margin-bottom:0.25rem">最大字符数</label>
-        <input type="number" id="maxChars" value="150000" min="10000" max="500000" step="10000" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)" onchange="updateHistoryConfig()">
-      </div>
-      <div>
-        <label style="display:block;font-size:0.875rem;color:var(--muted);margin-bottom:0.25rem">重试时保留消息数</label>
-        <input type="number" id="retryMaxMessages" value="15" min="3" max="50" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)" onchange="updateHistoryConfig()">
-      </div>
-      <div>
         <label style="display:block;font-size:0.875rem;color:var(--muted);margin-bottom:0.25rem">最大重试次数</label>
-        <input type="number" id="maxRetries" value="2" min="1" max="5" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)" onchange="updateHistoryConfig()">
+        <input type="number" id="maxRetries" value="3" min="1" max="5" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)" onchange="updateHistoryConfig()">
+        <span style="font-size:0.75rem;color:var(--muted)">超限错误后的重试次数</span>
+      </div>
+      <div>
+        <label style="display:block;font-size:0.875rem;color:var(--muted);margin-bottom:0.25rem">摘要缓存时间（秒）</label>
+        <input type="number" id="summaryCacheMaxAge" value="300" min="60" max="600" step="30" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)" onchange="updateHistoryConfig()">
+        <span style="font-size:0.75rem;color:var(--muted)">相同上下文复用摘要</span>
       </div>
     </div>
     
-    <div id="summaryOptions" style="display:none;margin-bottom:1rem;padding:1rem;background:var(--bg);border-radius:6px">
-      <p style="font-weight:500;margin-bottom:0.5rem">智能摘要选项：</p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem">
-        <div>
-          <label style="display:block;font-size:0.875rem;color:var(--muted);margin-bottom:0.25rem">保留最近消息数</label>
-          <input type="number" id="summaryKeepRecent" value="10" min="3" max="30" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)" onchange="updateHistoryConfig()">
-        </div>
-        <div>
-          <label style="display:block;font-size:0.875rem;color:var(--muted);margin-bottom:0.25rem">触发摘要阈值（字符）</label>
-          <input type="number" id="summaryThreshold" value="100000" min="50000" max="200000" step="10000" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)" onchange="updateHistoryConfig()">
-        </div>
-        <div>
-          <label style="display:block;font-size:0.875rem;color:var(--muted);margin-bottom:0.25rem">摘要缓存</label>
-          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
-            <input type="checkbox" id="summaryCacheEnabled" onchange="updateHistoryConfig()">
-            <span>启用摘要缓存</span>
-          </label>
-        </div>
-        <div>
-          <label style="display:block;font-size:0.875rem;color:var(--muted);margin-bottom:0.25rem">缓存刷新消息增量</label>
-          <input type="number" id="summaryCacheDeltaMessages" value="3" min="1" max="20" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)" onchange="updateHistoryConfig()">
-        </div>
-        <div>
-          <label style="display:block;font-size:0.875rem;color:var(--muted);margin-bottom:0.25rem">缓存刷新字符增量</label>
-          <input type="number" id="summaryCacheDeltaChars" value="4000" min="1000" max="50000" step="500" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)" onchange="updateHistoryConfig()">
-        </div>
-        <div>
-          <label style="display:block;font-size:0.875rem;color:var(--muted);margin-bottom:0.25rem">缓存最大复用秒数</label>
-          <input type="number" id="summaryCacheMaxAge" value="180" min="30" max="3600" step="30" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)" onchange="updateHistoryConfig()">
-        </div>
-      </div>
-    </div>
-    
-    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-bottom:1rem">
       <input type="checkbox" id="addWarningHeader" onchange="updateHistoryConfig()">
-      <span>截断时添加警告信息</span>
+      <span>压缩时在日志中显示信息</span>
     </label>
     
-    <div style="margin-top:1rem;padding:1rem;background:var(--bg);border-radius:6px">
-      <p style="font-size:0.875rem;color:var(--muted)">
-        <strong>策略说明：</strong><br>
-        • <strong>自动截断</strong>：每次请求前优先保留最新上下文并摘要前文，必要时按数量/字符截断<br>
-        • <strong>智能摘要</strong>：用 AI 生成早期对话摘要，保留关键信息（需额外 API 调用，增加延迟）<br>
-        • <strong>错误重试</strong>：收到长度超限错误后，截断历史消息并自动重试<br>
-        • <strong>预估检测</strong>：发送前估算 token 数量，超过阈值则预先截断<br>
+    <div style="padding:1rem;background:var(--bg);border-radius:6px">
+      <p style="font-size:0.875rem;color:var(--muted);margin:0">
+        <strong>工作原理：</strong><br>
+        1. 发送前自动检测历史消息大小<br>
+        2. 超过阈值时，用 AI 生成早期对话摘要<br>
+        3. 保留最近 6-20 条完整消息 + 摘要<br>
+        4. 收到超限错误时自动压缩并重试<br>
         <br>
-        推荐组合：<strong>错误重试</strong>（默认）或 <strong>智能摘要 + 错误重试</strong>
+        <span style="color:var(--success)">✓ 保留关键上下文</span> &nbsp;
+        <span style="color:var(--success)">✓ 自动管理无需配置</span> &nbsp;
+        <span style="color:var(--success)">✓ 智能缓存避免重复调用</span>
       </p>
     </div>
   </div>
@@ -1573,125 +1527,24 @@ async function exportFlows(){
 
 JS_SETTINGS = '''
 // 设置页面
-
-// 策略警告信息
-const strategyWarnings = {
-  error_retry: {
-    title: '⚠️ 关闭"错误重试"策略',
-    message: `关闭此策略后，当对话历史过长导致 Kiro API 返回错误时，代理将不会自动截断重试。
-
-<b>可能遇到的问题：</b>
-• 错误信息：CONTENT_LENGTH_EXCEEDS_THRESHOLD 或 "Input is too long"
-• HTTP 状态码：400 Bad Request
-• 客户端显示：请求失败、对话中断
-
-<b>为什么会发生：</b>
-Kiro API 对输入长度有限制，长对话会超过这个限制。
-
-<b>手动处理方法：</b>
-• Claude Code: 输入 /clear 清空对话历史
-• Codex CLI: 开始新对话
-• 其他客户端: 清空或缩短对话历史
-
-<b>建议：</b>保持此策略启用，除非你有特殊需求。`
-  },
-  auto_truncate: {
-    title: '⚠️ 关闭"自动截断"策略',
-    message: `关闭此策略后，代理将不会在发送前自动截断过长的历史消息。
-
-<b>可能遇到的问题：</b>
-• 请求可能因历史过长而失败
-• 需要依赖"错误重试"策略来处理
-
-<b>建议：</b>如果你启用了"错误重试"，可以关闭此策略。`
-  },
-  smart_summary: {
-    title: '关闭"智能摘要"策略',
-    message: `关闭此策略后，代理将不会用 AI 生成早期对话摘要。
-
-<b>影响：</b>
-• 截断时会丢失早期对话的上下文
-• 不会产生额外的 API 调用
-
-<b>建议：</b>如果你不需要保留早期对话上下文，可以关闭。`
-  },
-  pre_estimate: {
-    title: '关闭"预估检测"策略',
-    message: `关闭此策略后，代理将不会在发送前预估 token 数量。
-
-<b>影响：</b>
-• 可能会发送超长请求然后被拒绝
-• 需要依赖"错误重试"策略来处理
-
-<b>建议：</b>如果你启用了"错误重试"，可以关闭此策略。`
-  }
-};
-
-function onStrategyChange(strategy, checked) {
-  if (!checked && strategyWarnings[strategy]) {
-    const warning = strategyWarnings[strategy];
-    const confirmed = confirm(warning.title + '\\n\\n' + warning.message.replace(/<[^>]+>/g, ''));
-    if (!confirmed) {
-      // 用户取消，恢复勾选
-      if (strategy === 'error_retry') $('#strategyErrorRetry').checked = true;
-      else if (strategy === 'auto_truncate') $('#strategyAutoTruncate').checked = true;
-      else if (strategy === 'smart_summary') $('#strategySmartSummary').checked = true;
-      else if (strategy === 'pre_estimate') $('#strategyPreEstimate').checked = true;
-      return;
-    }
-  }
-  // 显示/隐藏摘要选项
-  $('#summaryOptions').style.display = $('#strategySmartSummary').checked ? 'block' : 'none';
-  updateHistoryConfig();
-}
+// 历史消息管理（简化版，自动管理）
 
 async function loadHistoryConfig(){
   try{
     const r=await fetch('/api/settings/history');
     const d=await r.json();
-    // 默认启用错误重试
-    const strategies = d.strategies || ['error_retry'];
-    $('#strategyAutoTruncate').checked=strategies.includes('auto_truncate');
-    $('#strategySmartSummary').checked=strategies.includes('smart_summary');
-    $('#strategyErrorRetry').checked=strategies.includes('error_retry');
-    $('#strategyPreEstimate').checked=strategies.includes('pre_estimate');
-    $('#maxMessages').value=d.max_messages||30;
-    $('#maxChars').value=d.max_chars||150000;
-    $('#retryMaxMessages').value=d.retry_max_messages||20;
-    $('#maxRetries').value=d.max_retries||2;
-    $('#summaryKeepRecent').value=d.summary_keep_recent||10;
-    $('#summaryThreshold').value=d.summary_threshold||100000;
-    $('#summaryCacheEnabled').checked=d.summary_cache_enabled!==false;
-    $('#summaryCacheDeltaMessages').value=d.summary_cache_min_delta_messages||3;
-    $('#summaryCacheDeltaChars').value=d.summary_cache_min_delta_chars||4000;
-    $('#summaryCacheMaxAge').value=d.summary_cache_max_age_seconds||180;
+    $('#maxRetries').value=d.max_retries||3;
+    $('#summaryCacheMaxAge').value=d.summary_cache_max_age_seconds||300;
     $('#addWarningHeader').checked=d.add_warning_header!==false;
-    // 显示/隐藏摘要选项
-    $('#summaryOptions').style.display=$('#strategySmartSummary').checked?'block':'none';
   }catch(e){console.error('加载配置失败:',e)}
 }
 
 async function updateHistoryConfig(){
-  const strategies=[];
-  if($('#strategyAutoTruncate').checked)strategies.push('auto_truncate');
-  if($('#strategySmartSummary').checked)strategies.push('smart_summary');
-  if($('#strategyErrorRetry').checked)strategies.push('error_retry');
-  if($('#strategyPreEstimate').checked)strategies.push('pre_estimate');
-  if(strategies.length===0)strategies.push('none');
-  // 显示/隐藏摘要选项
-  $('#summaryOptions').style.display=$('#strategySmartSummary').checked?'block':'none';
   const config={
-    strategies,
-    max_messages:parseInt($('#maxMessages').value)||30,
-    max_chars:parseInt($('#maxChars').value)||150000,
-    retry_max_messages:parseInt($('#retryMaxMessages').value)||15,
-    max_retries:parseInt($('#maxRetries').value)||2,
-    summary_keep_recent:parseInt($('#summaryKeepRecent').value)||10,
-    summary_threshold:parseInt($('#summaryThreshold').value)||100000,
-    summary_cache_enabled:$('#summaryCacheEnabled').checked,
-    summary_cache_min_delta_messages:parseInt($('#summaryCacheDeltaMessages').value)||3,
-    summary_cache_min_delta_chars:parseInt($('#summaryCacheDeltaChars').value)||4000,
-    summary_cache_max_age_seconds:parseInt($('#summaryCacheMaxAge').value)||180,
+    strategies:['error_retry'],  // 固定使用错误重试策略
+    max_retries:parseInt($('#maxRetries').value)||3,
+    summary_cache_enabled:true,
+    summary_cache_max_age_seconds:parseInt($('#summaryCacheMaxAge').value)||300,
     add_warning_header:$('#addWarningHeader').checked
   };
   try{
@@ -1828,13 +1681,11 @@ async function resetRateLimitConfig(){
 async function resetHistoryConfig(){
   if(!confirm('确定要还原历史消息配置为默认值吗？')) return;
   const defaultConfig={
-    max_messages:50,
-    max_chars:100000,
-    summary_threshold:30,
-    summary_max_length:2000,
-    retry_max_messages:15,
-    max_retries:2,
-    strategies:['error_retry']
+    strategies:['error_retry'],
+    max_retries:3,
+    summary_cache_enabled:true,
+    summary_cache_max_age_seconds:300,
+    add_warning_header:true
   };
   try{
     await fetch('/api/settings/history',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(defaultConfig)});

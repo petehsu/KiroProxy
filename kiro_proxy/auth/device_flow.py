@@ -288,11 +288,11 @@ async def save_credentials_to_file(credentials: dict, name: str = "kiro-proxy-au
     Returns:
         保存的文件路径
     """
-    cache_dir = Path.home() / ".aws/sso/cache"
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    from ..config import TOKEN_DIR
+    TOKEN_DIR.mkdir(parents=True, exist_ok=True)
     
     # 生成文件名
-    file_path = cache_dir / f"{name}.json"
+    file_path = TOKEN_DIR / f"{name}.json"
     
     with open(file_path, "w") as f:
         json.dump(credentials, f, indent=2)

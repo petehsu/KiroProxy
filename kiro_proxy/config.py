@@ -3,7 +3,15 @@ from pathlib import Path
 
 KIRO_API_URL = "https://q.us-east-1.amazonaws.com/generateAssistantResponse"
 MODELS_URL = "https://q.us-east-1.amazonaws.com/ListAvailableModels"
-TOKEN_PATH = Path.home() / ".aws/sso/cache/kiro-auth-token.json"
+
+# 统一数据目录 (所有配置文件都在这里)
+DATA_DIR = Path.home() / ".kiro-proxy"
+
+# Token 存储目录
+TOKEN_DIR = DATA_DIR / "tokens"
+
+# 默认 Token 路径 (兼容旧代码)
+TOKEN_PATH = TOKEN_DIR / "kiro-auth-token.json"
 
 # 配额管理配置
 QUOTA_COOLDOWN_SECONDS = 300  # 配额超限冷却时间（秒）

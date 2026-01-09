@@ -3,8 +3,11 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any
 
+# 统一使用 config.py 中的 DATA_DIR
+from ..config import DATA_DIR
+
 # 配置文件路径
-CONFIG_DIR = Path.home() / ".kiro-proxy"
+CONFIG_DIR = DATA_DIR
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 

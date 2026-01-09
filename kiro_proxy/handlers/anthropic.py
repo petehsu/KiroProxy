@@ -23,6 +23,15 @@ from ..converters import (
     extract_images_from_content
 )
 
+# 尝试导入 tiktoken，如果失败则使用估算方法
+try:
+    import tiktoken
+    _encoding = tiktoken.get_encoding("cl100k_base")
+    _USE_TIKTOKEN = True
+except ImportError:
+    _encoding = None
+    _USE_TIKTOKEN = False
+
 
 def _extract_text_from_content(content) -> str:
     if content is None:
@@ -43,9 +52,23 @@ def _extract_text_from_content(content) -> str:
 
 
 def _estimate_tokens(text: str) -> int:
+    """估算/计算 token 数量
+    
+    优先使用 tiktoken (cl100k_base)，否则使用字符估算：
+    - 中文字符：约 1.5 字符 = 1 token
+    - 其他字符：约 4 字符 = 1 token
+    """
     if not text:
         return 0
-    return (len(text) + 3) // 4
+    
+    if _USE_TIKTOKEN and _encoding:
+        return len(_encoding.encode(text))
+    
+    # 回退到字符估算
+    chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+    other_chars = len(text) - chinese_chars
+    tokens = int(chinese_chars / 1.5) + int(other_chars / 4)
+    return max(1, tokens)
 
 
 def _count_tokens_from_messages(messages, system: str = "") -> int:

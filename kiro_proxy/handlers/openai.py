@@ -17,6 +17,61 @@ from ..core.rate_limiter import get_rate_limiter
 from ..kiro_api import build_headers, build_kiro_request, parse_event_stream, is_quota_exceeded_error
 from ..converters import generate_session_id, convert_openai_messages_to_kiro, extract_images_from_content
 
+# 尝试导入 tiktoken，如果失败则使用估算方法
+try:
+    import tiktoken
+    _encoding = tiktoken.get_encoding("cl100k_base")
+    _USE_TIKTOKEN = True
+    print("[TokenCounter] 使用 tiktoken (cl100k_base) 进行 token 计数")
+except ImportError:
+    _encoding = None
+    _USE_TIKTOKEN = False
+    print("[TokenCounter] tiktoken 未安装，使用字符估算方法")
+
+
+def _estimate_tokens(text: str) -> int:
+    """估算/计算 token 数量
+    
+    优先使用 tiktoken (cl100k_base)，否则使用字符估算：
+    - 中文字符：约 1.5 字符 = 1 token
+    - 其他字符：约 4 字符 = 1 token
+    """
+    if not text:
+        return 0
+    
+    if _USE_TIKTOKEN and _encoding:
+        return len(_encoding.encode(text))
+    
+    # 回退到字符估算
+    chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+    other_chars = len(text) - chinese_chars
+    tokens = int(chinese_chars / 1.5) + int(other_chars / 4)
+    return max(1, tokens)
+
+
+def _estimate_input_tokens(messages: list, tools: list = None) -> int:
+    """估算/计算输入 token 数量"""
+    total = 0
+    
+    for msg in messages or []:
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            total += _estimate_tokens(content)
+        elif isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    total += _estimate_tokens(part.get("text", ""))
+        # 角色和消息结构开销
+        role = msg.get("role", "")
+        total += _estimate_tokens(role) + 4  # 每条消息的结构开销
+    
+    # 工具定义开销
+    if tools:
+        tools_json = json.dumps(tools)
+        total += _estimate_tokens(tools_json)
+    
+    return max(1, total)
+
 
 async def handle_chat_completions(request: Request):
     """处理 /v1/chat/completions 请求"""
@@ -262,6 +317,11 @@ async def handle_chat_completions(request: Request):
         latency_ms=duration
     )
     
+    # 估算 token 数量
+    prompt_tokens = _estimate_input_tokens(messages, tools)
+    completion_tokens = _estimate_tokens(content)
+    total_tokens = prompt_tokens + completion_tokens
+    
     if stream:
         async def generate():
             for chunk in [content[i:i+20] for i in range(0, len(content), 20)]:
@@ -275,12 +335,14 @@ async def handle_chat_completions(request: Request):
                 yield f"data: {json.dumps(data)}\n\n"
                 await asyncio.sleep(0.02)
             
+            # 最后一个 chunk 包含 usage 信息
             end_data = {
                 "id": f"chatcmpl-{log_id}",
                 "object": "chat.completion.chunk",
                 "created": int(time.time()),
                 "model": model,
-                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]
+                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": total_tokens}
             }
             yield f"data: {json.dumps(end_data)}\n\n"
             yield "data: [DONE]\n\n"
@@ -297,5 +359,5 @@ async def handle_chat_completions(request: Request):
             "message": {"role": "assistant", "content": content},
             "finish_reason": "stop"
         }],
-        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": total_tokens}
     }

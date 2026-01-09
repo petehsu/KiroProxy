@@ -199,10 +199,13 @@ async def speedtest():
 
 async def scan_tokens():
     """扫描系统中的 Kiro token 文件"""
+    from ..config import TOKEN_DIR
+    
     found = []
-    sso_cache = Path.home() / ".aws/sso/cache"
-    if sso_cache.exists():
-        for f in sso_cache.glob("*.json"):
+    
+    # 扫描新目录
+    if TOKEN_DIR.exists():
+        for f in TOKEN_DIR.glob("*.json"):
             try:
                 with open(f) as fp:
                     data = json.load(fp)
@@ -216,7 +219,7 @@ async def scan_tokens():
                         # 检查 IdC 配置完整性
                         idc_complete = None
                         if auth_method == "idc" and client_id_hash:
-                            hash_file = sso_cache / f"{client_id_hash}.json"
+                            hash_file = TOKEN_DIR / f"{client_id_hash}.json"
                             if hash_file.exists():
                                 try:
                                     with open(hash_file) as hf:
@@ -239,6 +242,31 @@ async def scan_tokens():
                         })
             except:
                 pass
+    
+    # 兼容：也扫描旧的 AWS SSO 目录
+    sso_cache = Path.home() / ".aws/sso/cache"
+    if sso_cache.exists():
+        for f in sso_cache.glob("*.json"):
+            try:
+                with open(f) as fp:
+                    data = json.load(fp)
+                    if "accessToken" in data:
+                        already_added = any(a.token_path == str(f) for a in state.accounts)
+                        auth_method = data.get("authMethod", "social")
+                        
+                        found.append({
+                            "path": str(f),
+                            "name": f.stem + " (旧目录)",
+                            "expires": data.get("expiresAt"),
+                            "auth_method": auth_method,
+                            "region": data.get("region", "us-east-1"),
+                            "has_refresh_token": "refreshToken" in data,
+                            "already_added": already_added,
+                            "idc_config_complete": None,
+                        })
+            except:
+                pass
+    
     return {"tokens": found}
 
 
@@ -361,16 +389,17 @@ async def get_quota_status():
 
 async def get_kiro_login_url():
     """获取 Kiro 登录说明"""
+    from ..config import TOKEN_DIR
     return {
-        "message": "Kiro 使用 AWS Identity Center 认证，无法直接 OAuth",
+        "message": "请使用本代理的登录功能，或从 Kiro IDE 导入 token",
         "instructions": [
-            "1. 打开 Kiro IDE",
-            "2. 点击登录按钮，使用 Google/GitHub 账号登录",
-            "3. 登录成功后，token 会自动保存到 ~/.aws/sso/cache/",
-            "4. 本代理会自动读取该 token"
+            "1. 点击「添加」按钮，选择登录方式",
+            "2. 或者从 Kiro IDE 的 ~/.aws/sso/cache/ 复制 token 文件",
+            "3. 将 token 文件放到 ~/.kiro-proxy/tokens/ 目录",
+            "4. 点击「扫描」按钮自动识别"
         ],
-        "token_path": str(TOKEN_PATH),
-        "token_exists": TOKEN_PATH.exists()
+        "token_dir": str(TOKEN_DIR),
+        "token_dir_exists": TOKEN_DIR.exists()
     }
 
 
@@ -1100,3 +1129,343 @@ def get_remote_login_page(session_id: str) -> str:
     </body>
     </html>
     """
+
+
+# ==================== 额度管理 API ====================
+
+async def get_accounts_status_enhanced():
+    """获取完整账号状态（增强版）"""
+    return {
+        "ok": True,
+        "summary": state.get_accounts_summary(),
+        "accounts": state.get_accounts_status()
+    }
+
+
+async def refresh_account_quota(account_id: str):
+    """刷新单个账号额度"""
+    from ..core import get_quota_scheduler
+    scheduler = get_quota_scheduler()
+    
+    success = await scheduler.refresh_account(account_id)
+    
+    if success:
+        return {"ok": True, "message": f"账号 {account_id} 额度刷新成功"}
+    else:
+        return {"ok": False, "error": f"账号 {account_id} 额度刷新失败"}
+
+
+async def refresh_all_quotas():
+    """刷新所有账号额度"""
+    from ..core import get_quota_scheduler
+    scheduler = get_quota_scheduler()
+    
+    results = await scheduler.refresh_all()
+    
+    success_count = sum(1 for v in results.values() if v)
+    fail_count = len(results) - success_count
+    
+    return {
+        "ok": True,
+        "results": results,
+        "success_count": success_count,
+        "fail_count": fail_count
+    }
+
+
+# ==================== 优先账号 API ====================
+
+async def get_priority_accounts():
+    """获取优先账号列表"""
+    from ..core import get_account_selector
+    selector = get_account_selector()
+    
+    priority_ids = selector.get_priority_accounts()
+    
+    # 获取账号详情
+    priority_accounts = []
+    for pid in priority_ids:
+        for acc in state.accounts:
+            if acc.id == pid:
+                priority_accounts.append({
+                    "id": acc.id,
+                    "name": acc.name,
+                    "enabled": acc.enabled,
+                    "available": acc.is_available(),
+                    "order": selector.get_priority_order(acc.id)
+                })
+                break
+    
+    return {
+        "ok": True,
+        "priority_accounts": priority_accounts,
+        "strategy": selector.strategy.value
+    }
+
+
+async def set_priority_account(account_id: str, request: Request):
+    """设置优先账号"""
+    from ..core import get_account_selector
+    selector = get_account_selector()
+    
+    body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+    position = body.get("position", -1)
+    
+    valid_ids = state.get_valid_account_ids()
+    success, message = selector.add_priority_account(account_id, position, valid_ids)
+    
+    return {"ok": success, "message": message}
+
+
+async def remove_priority_account(account_id: str):
+    """取消优先账号"""
+    from ..core import get_account_selector
+    selector = get_account_selector()
+    
+    success, message = selector.remove_priority_account(account_id)
+    
+    return {"ok": success, "message": message}
+
+
+async def reorder_priority_accounts(request: Request):
+    """调整优先账号顺序"""
+    from ..core import get_account_selector
+    selector = get_account_selector()
+    
+    body = await request.json()
+    account_ids = body.get("account_ids", [])
+    
+    success, message = selector.reorder_priority(account_ids)
+    
+    return {"ok": success, "message": message}
+
+
+# ==================== 汇总统计 API ====================
+
+async def get_accounts_summary():
+    """获取账号汇总统计"""
+    return {
+        "ok": True,
+        "summary": state.get_accounts_summary()
+    }
+
+
+# ==================== 刷新进度 API ====================
+
+async def get_refresh_progress():
+    """获取刷新进度"""
+    from ..core import get_refresh_manager
+    manager = get_refresh_manager()
+    
+    progress = manager.get_progress_dict()
+    is_refreshing = manager.is_refreshing()
+    
+    if progress:
+        return {
+            "ok": True,
+            "is_refreshing": is_refreshing,
+            "progress": progress,
+            "progress_percent": progress.get("total", 0) and round(
+                (progress.get("completed", 0) / progress.get("total", 1)) * 100, 2
+            )
+        }
+    else:
+        return {
+            "ok": True,
+            "is_refreshing": is_refreshing,
+            "progress": None,
+            "message": "没有进行中的刷新操作"
+        }
+
+
+async def refresh_all_with_progress():
+    """批量刷新（带进度和锁检查）
+    
+    使用 RefreshManager 进行批量刷新，支持：
+    - 全局锁防止重复刷新
+    - 进度跟踪
+    - 自动刷新 Token
+    - 重试机制
+    
+    注意：刷新操作在后台执行，API 立即返回，前端通过轮询获取进度。
+    """
+    import asyncio
+    from ..core import get_refresh_manager, get_account_usage
+    manager = get_refresh_manager()
+    
+    # 检查是否已有刷新在进行
+    if manager.is_refreshing():
+        progress = manager.get_progress_dict()
+        return {
+            "ok": False,
+            "error": "刷新操作正在进行中",
+            "progress": progress
+        }
+    
+    # 定义获取额度的函数
+    async def get_quota_func(account):
+        """获取账号额度"""
+        success, result = await get_account_usage(account)
+        if success:
+            # 更新额度缓存
+            from ..core import get_quota_cache
+            from ..core.quota_cache import CachedQuota
+            quota_cache = get_quota_cache()
+            cached_quota = CachedQuota.from_usage_info(account.id, result)
+            quota_cache.set(account.id, cached_quota)
+            return True, result
+        else:
+            return False, result
+    
+    # 定义后台刷新任务
+    async def background_refresh():
+        """后台执行刷新"""
+        try:
+            await manager.refresh_all_with_token(
+                accounts=state.accounts,
+                get_quota_func=get_quota_func,
+                skip_disabled=True,
+                skip_error=True
+            )
+        except Exception as e:
+            print(f"[RefreshManager] 后台刷新异常: {e}")
+    
+    # 启动后台任务，不等待完成
+    asyncio.create_task(background_refresh())
+    
+    # 立即返回，前端通过轮询获取进度
+    return {
+        "ok": True,
+        "message": "刷新任务已启动，请通过 /api/refresh/progress 获取进度"
+    }
+
+
+async def get_refresh_config():
+    """获取刷新配置"""
+    from ..core import get_refresh_manager
+    manager = get_refresh_manager()
+    
+    config = manager.config
+    return {
+        "ok": True,
+        "config": config.to_dict()
+    }
+
+
+async def update_refresh_config(request: Request):
+    """更新刷新配置"""
+    from ..core import get_refresh_manager
+    manager = get_refresh_manager()
+    
+    body = await request.json()
+    
+    try:
+        # 更新配置
+        manager.update_config(**body)
+        
+        return {
+            "ok": True,
+            "config": manager.config.to_dict(),
+            "message": "配置更新成功"
+        }
+    except ValueError as e:
+        return {
+            "ok": False,
+            "error": str(e)
+        }
+
+
+async def get_refresh_manager_status():
+    """获取刷新管理器状态"""
+    from ..core import get_refresh_manager
+    manager = get_refresh_manager()
+    
+    status = manager.get_status()
+    auto_refresh_status = manager.get_auto_refresh_status()
+    
+    return {
+        "ok": True,
+        "status": status,
+        "auto_refresh": auto_refresh_status,
+        "last_refresh_time": manager.get_last_refresh_time()
+    }
+
+
+# ==================== 集成 RefreshManager 到现有刷新接口 ====================
+
+async def refresh_account_token_with_manager(account_id: str):
+    """刷新指定账号的 token（集成 RefreshManager）
+    
+    刷新前自动检查 Token 状态，使用 RefreshManager 的重试机制。
+    """
+    from ..core import get_refresh_manager
+    manager = get_refresh_manager()
+    
+    # 查找账号
+    account = None
+    for acc in state.accounts:
+        if acc.id == account_id:
+            account = acc
+            break
+    
+    if not account:
+        return {"ok": False, "error": "账号不存在"}
+    
+    # 使用 RefreshManager 的重试机制刷新 Token
+    success, result = await manager.retry_with_backoff(
+        account.refresh_token
+    )
+    
+    if success:
+        return {"ok": True, "message": "Token 刷新成功"}
+    else:
+        return {"ok": False, "error": f"Token 刷新失败: {result}"}
+
+
+async def refresh_account_quota_with_token(account_id: str):
+    """刷新单个账号额度（先刷新 Token）
+    
+    在获取额度前自动检查并刷新 Token（如果需要）。
+    """
+    from ..core import get_refresh_manager, get_account_usage, get_quota_cache
+    manager = get_refresh_manager()
+    
+    # 查找账号
+    account = None
+    for acc in state.accounts:
+        if acc.id == account_id:
+            account = acc
+            break
+    
+    if not account:
+        return {"ok": False, "error": "账号不存在"}
+    
+    # 先刷新 Token（如果需要）
+    token_success, token_msg = await manager.refresh_token_if_needed(account)
+    
+    if not token_success:
+        return {"ok": False, "error": f"Token 刷新失败: {token_msg}"}
+    
+    # 获取额度
+    success, result = await get_account_usage(account)
+    
+    if success:
+        # 更新额度缓存
+        from ..core.quota_cache import CachedQuota
+        quota_cache = get_quota_cache()
+        cached_quota = CachedQuota.from_usage_info(account.id, result)
+        quota_cache.set(account.id, cached_quota)
+        
+        return {
+            "ok": True,
+            "message": f"账号 {account_id} 额度刷新成功",
+            "token_refreshed": token_msg != "Token 有效，无需刷新",
+            "usage": {
+                "balance": result.balance,
+                "current_usage": result.current_usage,
+                "usage_limit": result.usage_limit
+            }
+        }
+    else:
+        error_msg = result.get("error", "Unknown error") if isinstance(result, dict) else str(result)
+        return {"ok": False, "error": f"获取额度失败: {error_msg}"}

@@ -34,7 +34,31 @@ class Account:
             return False
         if not quota_manager.is_available(self.id):
             return False
+        
+        # 检查额度是否耗尽
+        from .quota_cache import get_quota_cache
+        quota_cache = get_quota_cache()
+        quota = quota_cache.get(self.id)
+        if quota and quota.is_exhausted:
+            return False
+        
         return True
+    
+    def is_active(self) -> bool:
+        """检查账号是否活跃（最近60秒内使用过）"""
+        from .quota_scheduler import get_quota_scheduler
+        scheduler = get_quota_scheduler()
+        return scheduler.is_active(self.id)
+    
+    def get_priority_order(self) -> Optional[int]:
+        """获取优先级顺序（从1开始），非优先账号返回 None"""
+        from .account_selector import get_account_selector
+        selector = get_account_selector()
+        return selector.get_priority_order(self.id)
+    
+    def is_priority(self) -> bool:
+        """检查是否为优先账号"""
+        return self.get_priority_order() is not None
     
     def load_credentials(self) -> Optional[KiroCredentials]:
         """加载凭证信息"""
@@ -147,6 +171,53 @@ class Account:
         cooldown_remaining = quota_manager.get_cooldown_remaining(self.id)
         creds = self.get_credentials()
         
+        # 获取额度信息
+        from .quota_cache import get_quota_cache
+        quota_cache = get_quota_cache()
+        quota = quota_cache.get(self.id)
+        
+        quota_info = None
+        if quota:
+            # 计算相对时间
+            updated_ago = ""
+            if quota.updated_at > 0:
+                seconds_ago = time.time() - quota.updated_at
+                if seconds_ago < 60:
+                    updated_ago = f"{int(seconds_ago)}秒前"
+                elif seconds_ago < 3600:
+                    updated_ago = f"{int(seconds_ago / 60)}分钟前"
+                else:
+                    updated_ago = f"{int(seconds_ago / 3600)}小时前"
+            
+            quota_info = {
+                "balance": quota.balance,
+                "usage_limit": quota.usage_limit,
+                "current_usage": quota.current_usage,
+                "usage_percent": quota.usage_percent,
+                "is_low_balance": quota.is_low_balance,
+                "is_exhausted": quota.is_exhausted,  # 额度是否耗尽
+                "balance_status": quota.balance_status,  # 额度状态: normal, low, exhausted
+                "subscription_title": quota.subscription_title,
+                "free_trial_limit": quota.free_trial_limit,
+                "free_trial_usage": quota.free_trial_usage,
+                "bonus_limit": quota.bonus_limit,
+                "bonus_usage": quota.bonus_usage,
+                "updated_at": updated_ago,
+                "updated_timestamp": quota.updated_at,
+                "error": quota.error
+            }
+        
+        # 计算最后使用时间
+        last_used_ago = None
+        if self.last_used:
+            seconds_ago = time.time() - self.last_used
+            if seconds_ago < 60:
+                last_used_ago = f"{int(seconds_ago)}秒前"
+            elif seconds_ago < 3600:
+                last_used_ago = f"{int(seconds_ago / 60)}分钟前"
+            else:
+                last_used_ago = f"{int(seconds_ago / 3600)}小时前"
+        
         return {
             "id": self.id,
             "name": self.name,
@@ -155,10 +226,19 @@ class Account:
             "available": self.is_available(),
             "request_count": self.request_count,
             "error_count": self.error_count,
+            "error_rate": f"{(self.error_count / max(1, self.request_count) * 100):.1f}%",
             "cooldown_remaining": cooldown_remaining,
             "token_expired": self.is_token_expired() if creds else None,
             "token_expiring_soon": self.is_token_expiring_soon() if creds else None,
+            "token_expires_at": creds.expires_at if creds else None,  # Token 过期时间戳
             "auth_method": creds.auth_method if creds else None,
             "has_refresh_token": bool(creds and creds.refresh_token),
             "idc_config_complete": bool(creds and creds.client_id and creds.client_secret) if creds and creds.auth_method == "idc" else None,
+            # 新增字段
+            "quota": quota_info,
+            "is_priority": self.is_priority(),
+            "priority_order": self.get_priority_order(),
+            "is_active": self.is_active(),
+            "last_used": self.last_used,
+            "last_used_ago": last_used_ago,
         }

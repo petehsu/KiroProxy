@@ -104,7 +104,7 @@ def cmd_accounts_add(args):
     print("-" * 40)
     
     name = input("账号名称 [我的账号]: ").strip() or "我的账号"
-    print("\n请粘贴 Access Token (从 ~/.aws/sso/cache/*.json 获取):")
+    print("\n请粘贴 Access Token:")
     access_token = input().strip()
     
     if not access_token:
@@ -138,24 +138,35 @@ def cmd_accounts_scan(args):
     """扫描本地 Token"""
     import uuid
     from .core import state, Account
+    from .config import TOKEN_DIR
     
-    sso_cache = Path.home() / ".aws/sso/cache"
-    if not sso_cache.exists():
-        print("未找到 ~/.aws/sso/cache 目录")
-        return
-    
+    # 扫描新目录
     found = []
-    for f in sso_cache.glob("*.json"):
-        try:
-            data = json.loads(f.read_text())
-            if "accessToken" in data:
-                already = any(a.token_path == str(f) for a in state.accounts)
-                found.append({"path": str(f), "name": f.stem, "already": already})
-        except:
-            pass
+    if TOKEN_DIR.exists():
+        for f in TOKEN_DIR.glob("*.json"):
+            try:
+                data = json.loads(f.read_text())
+                if "accessToken" in data:
+                    already = any(a.token_path == str(f) for a in state.accounts)
+                    found.append({"path": str(f), "name": f.stem, "already": already})
+            except:
+                pass
+    
+    # 兼容旧目录
+    sso_cache = Path.home() / ".aws/sso/cache"
+    if sso_cache.exists():
+        for f in sso_cache.glob("*.json"):
+            try:
+                data = json.loads(f.read_text())
+                if "accessToken" in data:
+                    already = any(a.token_path == str(f) for a in state.accounts)
+                    found.append({"path": str(f), "name": f.stem + " (旧目录)", "already": already})
+            except:
+                pass
     
     if not found:
         print("未找到 Token 文件")
+        print(f"Token 目录: {TOKEN_DIR}")
         return
     
     print(f"找到 {len(found)} 个 Token:\n")

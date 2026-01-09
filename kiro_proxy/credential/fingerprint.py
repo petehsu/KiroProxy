@@ -69,7 +69,10 @@ def generate_machine_id(
 
 
 def get_kiro_version() -> str:
-    """获取 Kiro IDE 版本号"""
+    """获取 Kiro IDE 版本号
+    
+    优先检测本地安装的 Kiro，否则使用默认版本 (与 kiro.rs 保持一致)
+    """
     if platform.system() == "Darwin":
         kiro_paths = [
             "/Applications/Kiro.app/Contents/Info.plist",
@@ -87,11 +90,15 @@ def get_kiro_version() -> str:
             except Exception:
                 pass
     
-    return "0.1.25"
+    # 默认版本与 kiro.rs 保持一致
+    return "0.8.0"
 
 
 def get_system_info() -> tuple:
-    """获取系统运行时信息 (os_name, node_version)"""
+    """获取系统运行时信息 (os_name, node_version)
+    
+    node_version 与 kiro.rs 保持一致
+    """
     system = platform.system()
     
     if system == "Darwin":
@@ -119,5 +126,6 @@ def get_system_info() -> tuple:
     else:
         os_name = "other#1.0"
     
-    node_version = "20.18.0"
+    # Node 版本与 kiro.rs 保持一致
+    node_version = "22.11.0"
     return os_name, node_version

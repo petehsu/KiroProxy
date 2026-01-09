@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import MODELS_URL
-from .core import state, scheduler, stats_manager
+from .core import state, scheduler, stats_manager, get_quota_scheduler, get_refresh_manager
 from .handlers import anthropic, openai, gemini, admin
 from .handlers import responses as responses_handler
 from .web.html import HTML_PAGE
@@ -28,8 +28,22 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时
     await scheduler.start()
+    
+    # 启动额度调度器
+    quota_scheduler = get_quota_scheduler()
+    quota_scheduler.set_accounts_getter(lambda: state.accounts)
+    await quota_scheduler.start()
+    
+    # 初始化刷新管理器
+    refresh_manager = get_refresh_manager()
+    refresh_manager.set_accounts_getter(lambda: state.accounts)
+    await refresh_manager.start_auto_refresh()
+    
     yield
+    
     # 关闭时
+    await refresh_manager.stop_auto_refresh()
+    await quota_scheduler.stop()
     await scheduler.stop()
 
 
@@ -187,6 +201,58 @@ async def api_refresh_all():
     return await admin.refresh_all_tokens()
 
 
+# ==================== 额度管理 API (必须在 {account_id} 路由之前) ====================
+
+@app.get("/api/accounts/status")
+async def api_accounts_status_enhanced():
+    """获取完整账号状态（增强版）"""
+    return await admin.get_accounts_status_enhanced()
+
+
+@app.get("/api/accounts/summary")
+async def api_accounts_summary():
+    """获取账号汇总统计"""
+    return await admin.get_accounts_summary()
+
+
+@app.post("/api/accounts/refresh-all-quotas")
+async def api_refresh_all_quotas():
+    """刷新所有账号额度"""
+    return await admin.refresh_all_quotas()
+
+
+# ==================== 刷新进度 API ====================
+
+@app.get("/api/refresh/progress")
+async def api_refresh_progress():
+    """获取刷新进度"""
+    return await admin.get_refresh_progress()
+
+
+@app.post("/api/refresh/all")
+async def api_refresh_all_with_progress():
+    """批量刷新（带进度和锁检查）"""
+    return await admin.refresh_all_with_progress()
+
+
+@app.get("/api/refresh/config")
+async def api_get_refresh_config():
+    """获取刷新配置"""
+    return await admin.get_refresh_config()
+
+
+@app.put("/api/refresh/config")
+async def api_update_refresh_config(request: Request):
+    """更新刷新配置"""
+    return await admin.update_refresh_config(request)
+
+
+@app.get("/api/refresh/status")
+async def api_refresh_status():
+    """获取刷新管理器状态"""
+    return await admin.get_refresh_manager_status()
+
+
 @app.get("/api/accounts")
 async def api_accounts():
     return await admin.get_accounts()
@@ -239,8 +305,8 @@ async def api_refresh_check():
 
 @app.post("/api/accounts/{account_id}/refresh")
 async def api_refresh_account(account_id: str):
-    """刷新指定账号的 token"""
-    return await admin.refresh_account_token(account_id)
+    """刷新指定账号的 token（集成 RefreshManager）"""
+    return await admin.refresh_account_token_with_manager(account_id)
 
 
 @app.post("/api/accounts/{account_id}/restore")
@@ -259,6 +325,38 @@ async def api_account_usage(account_id: str):
 async def api_account_detail(account_id: str):
     """获取账号详细信息"""
     return await admin.get_account_detail(account_id)
+
+
+@app.post("/api/accounts/{account_id}/refresh-quota")
+async def api_refresh_account_quota(account_id: str):
+    """刷新单个账号额度（先刷新 Token）"""
+    return await admin.refresh_account_quota_with_token(account_id)
+
+
+# ==================== 优先账号 API ====================
+
+@app.get("/api/priority")
+async def api_get_priority_accounts():
+    """获取优先账号列表"""
+    return await admin.get_priority_accounts()
+
+
+@app.post("/api/priority/{account_id}")
+async def api_set_priority_account(account_id: str, request: Request):
+    """设置优先账号"""
+    return await admin.set_priority_account(account_id, request)
+
+
+@app.delete("/api/priority/{account_id}")
+async def api_remove_priority_account(account_id: str):
+    """取消优先账号"""
+    return await admin.remove_priority_account(account_id)
+
+
+@app.put("/api/priority/reorder")
+async def api_reorder_priority_accounts(request: Request):
+    """调整优先账号顺序"""
+    return await admin.reorder_priority_accounts(request)
 
 
 @app.get("/api/quota")

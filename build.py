@@ -15,7 +15,7 @@ import subprocess
 from pathlib import Path
 
 APP_NAME = "KiroProxy"
-VERSION = "1.7.1"
+VERSION = "1.7.3"
 MAIN_SCRIPT = "run.py"
 ICON_DIR = Path("assets")
 
@@ -89,6 +89,15 @@ def build_app():
             args.extend(["--add-data", f"{docs_dir}:kiro_proxy/docs"])
         print(f"[OK] Adding docs directory")
     
+    # 添加 i18n 语言文件打包
+    i18n_dir = Path("kiro_proxy/web/i18n")
+    if i18n_dir.exists():
+        if platform == "windows":
+            args.extend(["--add-data", f"{i18n_dir};kiro_proxy/web/i18n"])
+        else:
+            args.extend(["--add-data", f"{i18n_dir}:kiro_proxy/web/i18n"])
+        print(f"[OK] Adding i18n directory")
+    
     hidden_imports = [
         "uvicorn.logging",
         "uvicorn.protocols.http",
@@ -104,6 +113,8 @@ def build_app():
         "anyio",
         "anyio._backends",
         "anyio._backends._asyncio",
+        "kiro_proxy.web.html",
+        "kiro_proxy.web.i18n",
     ]
     for imp in hidden_imports:
         args.extend(["--hidden-import", imp])

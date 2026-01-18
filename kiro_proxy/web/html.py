@@ -1576,14 +1576,14 @@ const I18N = {{
   "settings.cooldownLabel": "{js_escape(t('settings.cooldownLabel') if t('settings.cooldownLabel') != 'settings.cooldownLabel' else '429 Cooldown')}",
   "settings.cooldownDisabled": "{js_escape(t('settings.cooldownDisabled') if t('settings.cooldownDisabled') != 'settings.cooldownDisabled' else '429 Cooldown: Disabled')}",
   "docs.loadFailed": "{js_escape(t('docs.loadFailed') if t('docs.loadFailed') != 'docs.loadFailed' else 'Failed to load document')}",
-  "warning.errorRetry.title": "{'⚠️ Disable Error Retry Strategy' if lang == 'en' else '⚠️ 关闭\"错误重试\"策略'}",
-  "warning.errorRetry.message": "{'When disabled, the proxy will not auto-truncate and retry when conversation history is too long.\\n\\nPossible issues:\\n• Error: CONTENT_LENGTH_EXCEEDS_THRESHOLD\\n• HTTP 400 Bad Request\\n\\nManual fix: Use /clear in Claude Code to clear history.\\n\\nRecommend: Keep this enabled.' if lang == 'en' else '关闭此策略后，当对话历史过长时，代理将不会自动截断重试。\\n\\n可能遇到的问题：\\n• 错误信息：CONTENT_LENGTH_EXCEEDS_THRESHOLD\\n• HTTP 状态码：400 Bad Request\\n\\n手动处理：在 Claude Code 中输入 /clear 清空对话历史。\\n\\n建议：保持此策略启用。'}",
-  "warning.autoTruncate.title": "{'⚠️ Disable Auto Truncate Strategy' if lang == 'en' else '⚠️ 关闭\"自动截断\"策略'}",
-  "warning.autoTruncate.message": "{'When disabled, the proxy will not auto-truncate long history before sending.\\n\\nPossible issues:\\n• Request may fail due to long history\\n• Relies on Error Retry to handle\\n\\nRecommend: If Error Retry is enabled, you can disable this.' if lang == 'en' else '关闭此策略后，代理将不会在发送前自动截断过长的历史消息。\\n\\n可能遇到的问题：\\n• 请求可能因历史过长而失败\\n• 需要依赖\"错误重试\"策略来处理\\n\\n建议：如果你启用了\"错误重试\"，可以关闭此策略。'}",
-  "warning.smartSummary.title": "{'Disable Smart Summary Strategy' if lang == 'en' else '关闭\"智能摘要\"策略'}",
-  "warning.smartSummary.message": "{'When disabled, the proxy will not use AI to summarize early conversations.\\n\\nImpact:\\n• Early conversation context will be lost when truncating\\n• No extra API calls\\n\\nRecommend: If you don\\'t need early context, you can disable this.' if lang == 'en' else '关闭此策略后，代理将不会用 AI 生成早期对话摘要。\\n\\n影响：\\n• 截断时会丢失早期对话的上下文\\n• 不会产生额外的 API 调用\\n\\n建议：如果你不需要保留早期对话上下文，可以关闭。'}",
-  "warning.preEstimate.title": "{'Disable Pre-estimate Strategy' if lang == 'en' else '关闭\"预估检测\"策略'}",
-  "warning.preEstimate.message": "{'When disabled, the proxy will not estimate token count before sending.\\n\\nImpact:\\n• May send requests that are too long and get rejected\\n• Relies on Error Retry to handle\\n\\nRecommend: If Error Retry is enabled, you can disable this.' if lang == 'en' else '关闭此策略后，代理将不会在发送前预估 token 数量。\\n\\n影响：\\n• 可能会发送超长请求然后被拒绝\\n• 需要依赖\"错误重试\"策略来处理\\n\\n建议：如果你启用了\"错误重试\"，可以关闭此策略.'}"
+  "warning.errorRetry.title": "{'⚠️ Disable Error Retry Strategy' if lang == 'en' else '⚠️ 关闭错误重试策略'}",
+  "warning.errorRetry.message": "{'When disabled, the proxy will not auto-truncate and retry when conversation history is too long. Manual fix: Use /clear in Claude Code.' if lang == 'en' else '关闭此策略后，当对话历史过长时，代理将不会自动截断重试。手动处理：在 Claude Code 中输入 /clear 清空历史。'}",
+  "warning.autoTruncate.title": "{'⚠️ Disable Auto Truncate Strategy' if lang == 'en' else '⚠️ 关闭自动截断策略'}",
+  "warning.autoTruncate.message": "{'When disabled, the proxy will not auto-truncate long history before sending. Recommend: Enable Error Retry if disabling this.' if lang == 'en' else '关闭此策略后，代理将不会在发送前自动截断过长的历史消息。建议：如果关闭此策略，请启用错误重试。'}",
+  "warning.smartSummary.title": "{'Disable Smart Summary Strategy' if lang == 'en' else '关闭智能摘要策略'}",
+  "warning.smartSummary.message": "{'When disabled, the proxy will not use AI to summarize early conversations. No extra API calls will be made.' if lang == 'en' else '关闭此策略后，代理将不会用 AI 生成早期对话摘要。不会产生额外的 API 调用。'}",
+  "warning.preEstimate.title": "{'Disable Pre-estimate Strategy' if lang == 'en' else '关闭预估检测策略'}",
+  "warning.preEstimate.message": "{'When disabled, the proxy will not estimate token count before sending. Recommend: Enable Error Retry if disabling this.' if lang == 'en' else '关闭此策略后，代理将不会在发送前预估 token 数量。建议：如果关闭此策略，请启用错误重试。'}"
 }};
 function _(key) {{ return I18N[key] || key; }}
 '''

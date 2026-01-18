@@ -487,22 +487,41 @@ async def api_update_rate_limit_config(request: Request):
 
 # 文档标题映射
 DOC_TITLES = {
-    "01-quickstart": "快速开始",
-    "02-features": "功能特性",
-    "03-faq": "常见问题",
-    "04-api": "API 参考",
-    "05-server-deploy": "服务器部署",
+    "zh": {
+        "01-quickstart": "快速开始",
+        "02-features": "功能特性",
+        "03-faq": "常见问题",
+        "04-api": "API 参考",
+        "05-server-deploy": "服务器部署",
+    },
+    "en": {
+        "01-quickstart": "Quick Start",
+        "02-features": "Features",
+        "03-faq": "FAQ",
+        "04-api": "API Reference",
+        "05-server-deploy": "Server Deployment",
+    }
 }
+
+def _get_docs_dir_for_lang() -> Path:
+    """根据当前语言获取文档目录"""
+    from .web.i18n import get_current_lang
+    lang = get_current_lang()
+    lang_docs_dir = get_resource_path(f"kiro_proxy/docs/{lang}")
+    if lang_docs_dir.exists():
+        return lang_docs_dir, lang
+    return get_resource_path("kiro_proxy/docs"), "zh"
 
 @app.get("/api/docs")
 async def api_docs_list():
     """获取文档列表"""
-    docs_dir = get_resource_path("kiro_proxy/docs")
+    docs_dir, lang = _get_docs_dir_for_lang()
+    titles = DOC_TITLES.get(lang, DOC_TITLES["zh"])
     docs = []
     if docs_dir.exists():
         for doc_file in sorted(docs_dir.glob("*.md")):
             doc_id = doc_file.stem
-            title = DOC_TITLES.get(doc_id, doc_id)
+            title = titles.get(doc_id, doc_id)
             docs.append({"id": doc_id, "title": title})
     return {"docs": docs}
 
@@ -510,12 +529,18 @@ async def api_docs_list():
 @app.get("/api/docs/{doc_id}")
 async def api_docs_content(doc_id: str):
     """获取文档内容"""
-    docs_dir = get_resource_path("kiro_proxy/docs")
+    docs_dir, lang = _get_docs_dir_for_lang()
+    titles = DOC_TITLES.get(lang, DOC_TITLES["zh"])
     doc_file = docs_dir / f"{doc_id}.md"
     if not doc_file.exists():
-        raise HTTPException(status_code=404, detail="文档不存在")
+        # 回退到默认目录
+        fallback_dir = get_resource_path("kiro_proxy/docs")
+        doc_file = fallback_dir / f"{doc_id}.md"
+        if not doc_file.exists():
+            error_msg = "Document not found" if lang == "en" else "文档不存在"
+            raise HTTPException(status_code=404, detail=error_msg)
     content = doc_file.read_text(encoding="utf-8")
-    title = DOC_TITLES.get(doc_id, doc_id)
+    title = titles.get(doc_id, doc_id)
     return {"id": doc_id, "title": title, "content": content}
 
 

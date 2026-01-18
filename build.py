@@ -113,11 +113,21 @@ def build_app():
         "anyio",
         "anyio._backends",
         "anyio._backends._asyncio",
+        "kiro_proxy",
+        "kiro_proxy.web",
         "kiro_proxy.web.html",
         "kiro_proxy.web.i18n",
+        "kiro_proxy.core",
+        "kiro_proxy.handlers",
+        "kiro_proxy.credential",
+        "kiro_proxy.auth",
     ]
     for imp in hidden_imports:
         args.extend(["--hidden-import", imp])
+    
+    # 收集整个 kiro_proxy 包的所有子模块
+    args.extend(["--collect-submodules", "kiro_proxy"])
+    args.extend(["--collect-data", "kiro_proxy"])
     
     args.append(MAIN_SCRIPT)
     args = [a for a in args if a]

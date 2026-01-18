@@ -710,7 +710,7 @@ async function showDoc(id) {
     currentDoc = d;
     $('#docsContent').innerHTML = renderMarkdown(d.content);
   } catch (e) {
-    $('#docsContent').innerHTML = '<p style="color:var(--error)">加载文档失败</p>';
+    $('#docsContent').innerHTML = '<p style="color:var(--error)">'+_('docs.loadFailed')+'</p>';
   }
 }
 
@@ -725,11 +725,11 @@ async function loadStats(){
     const r=await fetch('/api/stats');
     const d=await r.json();
     $('#statsGrid').innerHTML=`
-      <div class="stat-item"><div class="stat-value">${d.total_requests}</div><div class="stat-label">总请求</div></div>
-      <div class="stat-item"><div class="stat-value">${d.total_errors}</div><div class="stat-label">错误数</div></div>
-      <div class="stat-item"><div class="stat-value">${d.error_rate}</div><div class="stat-label">错误率</div></div>
-      <div class="stat-item"><div class="stat-value">${d.accounts_available}/${d.accounts_total}</div><div class="stat-label">可用账号</div></div>
-      <div class="stat-item"><div class="stat-value">${d.accounts_cooldown||0}</div><div class="stat-label">冷却中</div></div>
+      <div class="stat-item"><div class="stat-value">${d.total_requests}</div><div class="stat-label">${_('monitor.totalRequests')}</div></div>
+      <div class="stat-item"><div class="stat-value">${d.total_errors}</div><div class="stat-label">${_('monitor.errorCount')}</div></div>
+      <div class="stat-item"><div class="stat-value">${d.error_rate}</div><div class="stat-label">${_('monitor.errorRate')}</div></div>
+      <div class="stat-item"><div class="stat-value">${d.accounts_available}/${d.accounts_total}</div><div class="stat-label">${_('monitor.availableAccounts')}</div></div>
+      <div class="stat-item"><div class="stat-value">${d.accounts_cooldown||0}</div><div class="stat-label">${_('monitor.cooldownAccounts')}</div></div>
     `;
   }catch(e){console.error(e)}
 }
@@ -742,13 +742,13 @@ async function loadQuota(){
     if(d.exceeded_credentials&&d.exceeded_credentials.length>0){
       $('#quotaStatus').innerHTML=d.exceeded_credentials.map(c=>`
         <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem;background:var(--bg);border-radius:4px;margin-bottom:0.5rem">
-          <span><span class="badge warn">冷却中</span> ${c.credential_id}</span>
-          <span style="color:var(--muted);font-size:0.8rem">剩余 ${c.remaining_seconds}秒</span>
-          <button class="secondary small" onclick="restoreAccount('${c.credential_id}')">恢复</button>
+          <span><span class="badge warn">${_('accounts.cooldown')}</span> ${c.credential_id}</span>
+          <span style="color:var(--muted);font-size:0.8rem">${_('monitor.remaining')} ${c.remaining_seconds}${_('time.seconds')}</span>
+          <button class="secondary small" onclick="restoreAccount('${c.credential_id}')">${_('common.restore')}</button>
         </div>
       `).join('');
     }else{
-      $('#quotaStatus').innerHTML='<p style="color:var(--muted)">无冷却中的账号</p>';
+      $('#quotaStatus').innerHTML='<p style="color:var(--muted)">'+_('monitor.noCooldown')+'</p>';
     }
   }catch(e){console.error(e)}
 }
@@ -756,12 +756,12 @@ async function loadQuota(){
 // Speedtest
 async function runSpeedtest(){
   $('#speedtestBtn').disabled=true;
-  $('#speedtestResult').textContent='测试中...';
+  $('#speedtestResult').textContent=_('monitor.testing');
   try{
     const r=await fetch('/api/speedtest',{method:'POST'});
     const d=await r.json();
-    $('#speedtestResult').textContent=d.ok?`延迟: ${d.latency_ms.toFixed(0)}ms (${d.account_id})`:'测试失败: '+d.error;
-  }catch(e){$('#speedtestResult').textContent='测试失败'}
+    $('#speedtestResult').textContent=d.ok?`${_('monitor.latency')}: ${d.latency_ms.toFixed(0)}ms (${d.account_id})`:_('monitor.testFailed')+': '+d.error;
+  }catch(e){$('#speedtestResult').textContent=_('monitor.testFailed')}
   $('#speedtestBtn').disabled=false;
 }
 '''
@@ -1550,6 +1550,7 @@ const I18N = {{
   "common.disabled": "{js_escape(t('common.disabled'))}",
   "common.delete": "{js_escape(t('common.delete'))}",
   "common.loading": "{js_escape(t('common.loading'))}",
+  "common.restore": "{js_escape(t('accounts.restore'))}",
   "accounts.available": "{js_escape(t('accounts.available'))}",
   "accounts.cooldown": "{js_escape(t('accounts.cooldown'))}",
   "accounts.unhealthy": "{js_escape(t('accounts.unhealthy'))}",
@@ -1574,7 +1575,31 @@ const I18N = {{
   "msg.noTokensFound": "{js_escape(t('msg.noTokensFound'))}",
   "time.seconds": "{js_escape(t('time.seconds'))}",
   "time.minutes": "{js_escape(t('time.minutes'))}",
-  "time.hours": "{js_escape(t('time.hours'))}"
+  "time.hours": "{js_escape(t('time.hours'))}",
+  "monitor.totalRequests": "{js_escape(t('monitor.totalRequests'))}",
+  "monitor.errorCount": "{js_escape(t('monitor.errorCount'))}",
+  "monitor.errorRate": "{js_escape(t('monitor.errorRate') if t('monitor.errorRate') != 'monitor.errorRate' else 'Error Rate')}",
+  "monitor.availableAccounts": "{js_escape(t('monitor.availableAccounts'))}",
+  "monitor.cooldownAccounts": "{js_escape(t('accounts.cooldown'))}",
+  "monitor.noCooldown": "{js_escape(t('monitor.noCooldown') if t('monitor.noCooldown') != 'monitor.noCooldown' else 'No accounts in cooldown')}",
+  "monitor.testing": "{js_escape(t('monitor.testing') if t('monitor.testing') != 'monitor.testing' else 'Testing...')}",
+  "monitor.testFailed": "{js_escape(t('monitor.testFailed') if t('monitor.testFailed') != 'monitor.testFailed' else 'Test failed')}",
+  "monitor.latency": "{js_escape(t('monitor.latency') if t('monitor.latency') != 'monitor.latency' else 'Latency')}",
+  "monitor.remaining": "{js_escape(t('monitor.remaining') if t('monitor.remaining') != 'monitor.remaining' else 'Remaining')}",
+  "flows.totalRequests": "{js_escape(t('monitor.totalRequests'))}",
+  "flows.completed": "{js_escape(t('flows.completed'))}",
+  "flows.error": "{js_escape(t('flows.error'))}",
+  "flows.errorRate": "{js_escape(t('monitor.errorRate') if t('monitor.errorRate') != 'monitor.errorRate' else 'Error Rate')}",
+  "flows.avgLatency": "{js_escape(t('flows.avgLatency') if t('flows.avgLatency') != 'flows.avgLatency' else 'Avg Latency')}",
+  "flows.inputTokens": "{js_escape(t('flows.inputTokens') if t('flows.inputTokens') != 'flows.inputTokens' else 'Input Tokens')}",
+  "flows.outputTokens": "{js_escape(t('flows.outputTokens') if t('flows.outputTokens') != 'flows.outputTokens' else 'Output Tokens')}",
+  "flows.noRecords": "{js_escape(t('flows.noRecords') if t('flows.noRecords') != 'flows.noRecords' else 'No request records')}",
+  "logs.path": "{js_escape(t('logs.path') if t('logs.path') != 'logs.path' else 'Path')}",
+  "logs.status": "{js_escape(t('logs.status') if t('logs.status') != 'logs.status' else 'Status')}",
+  "settings.status": "{js_escape(t('settings.status') if t('settings.status') != 'settings.status' else 'Status')}",
+  "settings.globalRPM": "{js_escape(t('settings.globalRPM') if t('settings.globalRPM') != 'settings.globalRPM' else 'Global RPM')}",
+  "settings.cooldownDisabled": "{js_escape(t('settings.cooldownDisabled') if t('settings.cooldownDisabled') != 'settings.cooldownDisabled' else '429 Cooldown: Disabled')}",
+  "docs.loadFailed": "{js_escape(t('docs.loadFailed') if t('docs.loadFailed') != 'docs.loadFailed' else 'Failed to load document')}"
 }};
 function _(key) {{ return I18N[key] || key; }}
 '''
@@ -1693,6 +1718,13 @@ function _(key) {{ return I18N[key] || key; }}
         '>缓存刷新字符增量<': f'>{t("settings.cacheDeltaChars")}<',
         '>缓存最大复用秒数<': f'>{t("settings.cacheMaxAge")}<',
         '>截断时添加警告信息<': f'>{t("settings.addWarningHeader")}<',
+        # Logs - path header
+        '>路径<': f'>{t("logs.path") if t("logs.path") != "logs.path" else "Path"}<',
+        # Accounts - login methods
+        '>登录方式<': f'>{t("accounts.loginMethods") if t("accounts.loginMethods") != "accounts.loginMethods" else "Login Methods"}<',
+        '><strong>在线登录</strong> - 本机浏览器授权 | <strong>远程登录链接</strong> - 生成链接在其他机器授权<': f'><strong>{t("accounts.onlineLogin")}</strong> - {t("accounts.onlineLoginDesc") if t("accounts.onlineLoginDesc") != "accounts.onlineLoginDesc" else "Local browser auth"} | <strong>{t("accounts.remoteLogin")}</strong> - {t("accounts.remoteLoginDesc") if t("accounts.remoteLoginDesc") != "accounts.remoteLoginDesc" else "Generate link for other machines"}<',
+        '><strong>扫描 Token</strong> - 从 Kiro IDE 扫描 | <strong>手动添加</strong> - 直接粘贴 Token<': f'><strong>{t("accounts.scan")}</strong> - {t("accounts.scanDesc") if t("accounts.scanDesc") != "accounts.scanDesc" else "Scan from Kiro IDE"} | <strong>{t("accounts.manualAdd")}</strong> - {t("accounts.manualAddDesc") if t("accounts.manualAddDesc") != "accounts.manualAddDesc" else "Paste Token directly"}<',
+        '><strong>导入导出</strong> - 跨机器迁移账号配置<': f'><strong>{t("accounts.exportImport") if t("accounts.exportImport") != "accounts.exportImport" else "Export/Import"}</strong> - {t("accounts.exportImportDesc") if t("accounts.exportImportDesc") != "accounts.exportImportDesc" else "Migrate configs across machines"}<',
     }
     
     # 组装并翻译 HTML

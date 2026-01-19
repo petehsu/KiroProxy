@@ -1677,7 +1677,7 @@ function _(key) {{ return I18N[key] || key; }}
         '>请求限速 <': f'>{"Rate Limiting" if lang == "en" else "请求限速"} <',
         '启用后会限制请求频率，并在遇到 429 错误时短暂冷却账号': f'{"When enabled, limits request frequency and briefly cools down accounts on 429 errors" if lang == "en" else "启用后会限制请求频率，并在遇到 429 错误时短暂冷却账号"}',
         '>启用限速<': f'>{"Enable Rate Limiting" if lang == "en" else "启用限速"}<',
-        '（关闭时 429 错误不会导致账号冷却）': f'{"(When off, 429 errors won't cooldown accounts)" if lang == "en" else "（关闭时 429 错误不会导致账号冷却）"}',
+        '（关闭时 429 错误不会导致账号冷却）': "(When off, 429 errors won't cooldown accounts)" if lang == "en" else "（关闭时 429 错误不会导致账号冷却）",
         '>最小请求间隔（秒）<': f'>{"Min Request Interval (sec)" if lang == "en" else "最小请求间隔（秒）"}<',
         '>每账号每分钟最大请求<': f'>{"Max Requests Per Minute Per Account" if lang == "en" else "每账号每分钟最大请求"}<',
         '>全局每分钟最大请求<': f'>{"Global Max Requests Per Minute" if lang == "en" else "全局每分钟最大请求"}<',

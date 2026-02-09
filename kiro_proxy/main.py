@@ -107,6 +107,7 @@ async def models():
         {"id": "claude-sonnet-4", "object": "model", "owned_by": "kiro", "name": "Claude Sonnet 4"},
         {"id": "claude-haiku-4.5", "object": "model", "owned_by": "kiro", "name": "Claude Haiku 4.5"},
         {"id": "claude-opus-4.5", "object": "model", "owned_by": "kiro", "name": "Claude Opus 4.5"},
+        {"id": "claude-opus-4.6", "object": "model", "owned_by": "kiro", "name": "Claude Opus 4.6"},
     ]}
 
 

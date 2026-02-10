@@ -119,8 +119,9 @@ async def handle_generate_content(model_name: str, request: Request):
     content = ""
     current_account = account
     max_retries = 2
-    
-    for retry in range(max_retries + 1):
+
+    try:
+      for retry in range(max_retries + 1):
         try:
             async with httpx.AsyncClient(verify=False, timeout=120) as client:
                 resp = await client.post(KIRO_API_URL, json=kiro_request, headers=headers)
@@ -239,20 +240,20 @@ async def handle_generate_content(model_name: str, request: Request):
                 await asyncio.sleep(0.5 * (2 ** retry))
                 continue
             raise HTTPException(500, str(e))
-    
-    # 记录日志
-    duration = (time.time() - start_time) * 1000
-    state.add_log(RequestLog(
-        id=log_id,
-        timestamp=time.time(),
-        method="POST",
-        path=f"/v1/models/{model_name}:generateContent",
-        model=model,
-        account_id=current_account.id if current_account else None,
-        status=status_code,
-        duration_ms=duration,
-        error=error_msg
-    ))
+    finally:
+        # 记录日志
+        duration = (time.time() - start_time) * 1000
+        state.add_log(RequestLog(
+            id=log_id,
+            timestamp=time.time(),
+            method="POST",
+            path=f"/v1/models/{model_name}:generateContent",
+            model=model,
+            account_id=current_account.id if current_account else None,
+            status=status_code,
+            duration_ms=duration,
+            error=error_msg
+        ))
     
     # 使用转换函数生成 Gemini 格式响应
     return convert_kiro_response_to_gemini(result, model)

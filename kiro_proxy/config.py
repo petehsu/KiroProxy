@@ -43,9 +43,10 @@ MODEL_MAPPING = {
     "sonnet": "claude-sonnet-4",
     "haiku": "claude-haiku-4.5",
     "opus": "claude-opus-4.5",
+    "opus-4.6": "claude-opus-4.6",
 }
 
-KIRO_MODELS = {"auto", "claude-sonnet-4.5", "claude-sonnet-4", "claude-haiku-4.5", "claude-opus-4.5"}
+KIRO_MODELS = {"auto", "claude-sonnet-4.5", "claude-sonnet-4", "claude-haiku-4.5", "claude-opus-4.5", "claude-opus-4.6"}
 
 def map_model_name(model: str) -> str:
     """将外部模型名称映射到 Kiro 支持的名称"""
@@ -57,7 +58,7 @@ def map_model_name(model: str) -> str:
         return model
     model_lower = model.lower()
     if "opus" in model_lower:
-        return "claude-opus-4.5"
+        return "claude-opus-4.5" if "4.5" in model_lower else "claude-opus-4.6"
     if "haiku" in model_lower:
         return "claude-haiku-4.5"
     if "sonnet" in model_lower:

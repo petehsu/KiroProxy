@@ -515,17 +515,47 @@ async def handle_responses(request: Request):
         return await _handle_stream(kiro_request, headers, account, model, log_id, start_time)
     
     # 非流式
-    async with httpx.AsyncClient(verify=False, timeout=120) as client:
-        resp = await client.post(KIRO_API_URL, json=kiro_request, headers=headers)
-        if resp.status_code != 200:
-            raise HTTPException(resp.status_code, resp.text)
-        
-        result = parse_event_stream_full(resp.content)
-        account.request_count += 1
-        account.last_used = time.time()
-        get_rate_limiter().record_request(account.id)
-        
-        return _build_response(result, model, log_id)
+    status_code = 0
+    error_msg = None
+    try:
+        async with httpx.AsyncClient(verify=False, timeout=120) as client:
+            resp = await client.post(KIRO_API_URL, json=kiro_request, headers=headers)
+            status_code = resp.status_code
+            if resp.status_code != 200:
+                error_msg = resp.text[:500]
+                raise HTTPException(resp.status_code, resp.text)
+
+            result = parse_event_stream_full(resp.content)
+            account.request_count += 1
+            account.last_used = time.time()
+            get_rate_limiter().record_request(account.id)
+
+            return _build_response(result, model, log_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        status_code = 500
+        raise
+    finally:
+        duration = (time.time() - start_time) * 1000
+        state.add_log(RequestLog(
+            id=log_id,
+            timestamp=time.time(),
+            method="POST",
+            path="/v1/responses",
+            model=model,
+            account_id=account.id if account else None,
+            status=status_code,
+            duration_ms=duration,
+            error=error_msg
+        ))
+        stats_manager.record_request(
+            account_id=account.id if account else "unknown",
+            model=model,
+            success=status_code == 200,
+            duration_ms=duration
+        )
 
 
 def _build_response(result: dict, model: str, response_id: str) -> dict:
@@ -655,6 +685,24 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                                 "error": {"code": error_code, "message": error_msg[:200]}
                             }
                         })
+                        duration = (time.time() - start_time) * 1000
+                        state.add_log(RequestLog(
+                            id=log_id,
+                            timestamp=time.time(),
+                            method="POST",
+                            path="/v1/responses (stream)",
+                            model=model,
+                            account_id=account.id if account else None,
+                            status=response.status_code,
+                            duration_ms=duration,
+                            error=error_msg[:200]
+                        ))
+                        stats_manager.record_request(
+                            account_id=account.id if account else "unknown",
+                            model=model,
+                            success=False,
+                            duration_ms=duration
+                        )
                         return
                     
                     # 1. response.created
@@ -720,6 +768,24 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                     "error": {"code": "internal_error", "message": str(e)[:200]}
                 }
             })
+            duration = (time.time() - start_time) * 1000
+            state.add_log(RequestLog(
+                id=log_id,
+                timestamp=time.time(),
+                method="POST",
+                path="/v1/responses (stream)",
+                model=model,
+                account_id=account.id if account else None,
+                status=500,
+                duration_ms=duration,
+                error=str(e)[:200]
+            ))
+            stats_manager.record_request(
+                account_id=account.id if account else "unknown",
+                model=model,
+                success=False,
+                duration_ms=duration
+            )
             return
         
         # 4. response.output_item.done - 消息完成
@@ -789,7 +855,27 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                 }
             }
         })
-    
+
+        # 记录成功的流式请求日志
+        duration = (time.time() - start_time) * 1000
+        state.add_log(RequestLog(
+            id=log_id,
+            timestamp=time.time(),
+            method="POST",
+            path="/v1/responses (stream)",
+            model=model,
+            account_id=account.id if account else None,
+            status=200,
+            duration_ms=duration,
+            error=None
+        ))
+        stats_manager.record_request(
+            account_id=account.id if account else "unknown",
+            model=model,
+            success=True,
+            duration_ms=duration
+        )
+
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 

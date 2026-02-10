@@ -118,8 +118,9 @@ async def handle_chat_completions(request: Request):
     content = ""
     current_account = account
     max_retries = 2
-    
-    for retry in range(max_retries + 1):
+
+    try:
+      for retry in range(max_retries + 1):
         try:
             async with httpx.AsyncClient(verify=False, timeout=120) as client:
                 resp = await client.post(KIRO_API_URL, json=kiro_request, headers=headers)
@@ -239,28 +240,28 @@ async def handle_chat_completions(request: Request):
                 await asyncio.sleep(0.5 * (2 ** retry))
                 continue
             raise HTTPException(500, str(e))
-    
-    # 记录日志
-    duration = (time.time() - start_time) * 1000
-    state.add_log(RequestLog(
-        id=log_id,
-        timestamp=time.time(),
-        method="POST",
-        path="/v1/chat/completions",
-        model=model,
-        account_id=current_account.id if current_account else None,
-        status=status_code,
-        duration_ms=duration,
-        error=error_msg
-    ))
-    
-    # 记录统计
-    stats_manager.record_request(
-        account_id=current_account.id if current_account else "unknown",
-        model=model,
-        success=status_code == 200,
-        latency_ms=duration
-    )
+    finally:
+        # 记录日志
+        duration = (time.time() - start_time) * 1000
+        state.add_log(RequestLog(
+            id=log_id,
+            timestamp=time.time(),
+            method="POST",
+            path="/v1/chat/completions",
+            model=model,
+            account_id=current_account.id if current_account else None,
+            status=status_code,
+            duration_ms=duration,
+            error=error_msg
+        ))
+
+        # 记录统计
+        stats_manager.record_request(
+            account_id=current_account.id if current_account else "unknown",
+            model=model,
+            success=status_code == 200,
+            latency_ms=duration
+        )
     
     if stream:
         async def generate():

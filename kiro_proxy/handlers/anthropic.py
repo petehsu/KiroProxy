@@ -243,7 +243,14 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                             
                             if flow_id:
                                 flow_monitor.fail_flow(flow_id, "rate_limit_error", "All accounts rate limited", 429)
-                            yield f'data: {{"type":"error","error":{{"type":"rate_limit_error","message":"All accounts rate limited"}}}}\n\n'
+                            yield f'event: error\ndata: {{"type":"error","error":{{"type":"rate_limit_error","message":"All accounts rate limited"}}}}\n\n'
+                            duration = (time.time() - start_time) * 1000
+                            state.add_log(RequestLog(
+                                id=log_id, timestamp=time.time(), method="POST", path="/v1/messages",
+                                model=model, account_id=current_account.id if current_account else None,
+                                status=429, duration_ms=duration, error="All accounts rate limited"
+                            ))
+                            stats_manager.record_request(account_id=current_account.id if current_account else "unknown", model=model, success=False, latency_ms=duration)
                             return
 
                         # 处理可重试的服务端错误
@@ -256,7 +263,14 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                                 continue
                             if flow_id:
                                 flow_monitor.fail_flow(flow_id, "api_error", "Server error after retries", response.status_code)
-                            yield f'data: {{"type":"error","error":{{"type":"api_error","message":"Server error after retries"}}}}\n\n'
+                            yield f'event: error\ndata: {{"type":"error","error":{{"type":"api_error","message":"Server error after retries"}}}}\n\n'
+                            duration = (time.time() - start_time) * 1000
+                            state.add_log(RequestLog(
+                                id=log_id, timestamp=time.time(), method="POST", path="/v1/messages",
+                                model=model, account_id=current_account.id if current_account else None,
+                                status=response.status_code, duration_ms=duration, error="Server error after retries"
+                            ))
+                            stats_manager.record_request(account_id=current_account.id if current_account else "unknown", model=model, success=False, latency_ms=duration)
                             return
 
                         if response.status_code != 200:
@@ -326,7 +340,14 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                             
                             if flow_id:
                                 flow_monitor.fail_flow(flow_id, error_type, error_msg, response.status_code, error_str)
-                            yield f'data: {{"type":"error","error":{{"type":"{error_type}","message":"{error_msg}"}}}}\n\n'
+                            yield f'event: error\ndata: {{"type":"error","error":{{"type":"{error_type}","message":"{error_msg}"}}}}\n\n'
+                            duration = (time.time() - start_time) * 1000
+                            state.add_log(RequestLog(
+                                id=log_id, timestamp=time.time(), method="POST", path="/v1/messages",
+                                model=model, account_id=current_account.id if current_account else None,
+                                status=response.status_code, duration_ms=duration, error=error_msg
+                            ))
+                            stats_manager.record_request(account_id=current_account.id if current_account else "unknown", model=model, success=False, latency_ms=duration)
                             return
 
                         # 标记开始流式传输
@@ -335,8 +356,9 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
 
                         # 正常处理响应
                         msg_id = f"msg_{log_id}"
-                        yield f'data: {{"type":"message_start","message":{{"id":"{msg_id}","type":"message","role":"assistant","content":[],"model":"{model}","stop_reason":null,"stop_sequence":null,"usage":{{"input_tokens":0,"output_tokens":0}}}}}}\n\n'
-                        yield f'data: {{"type":"content_block_start","index":0,"content_block":{{"type":"text","text":""}}}}\n\n'
+                        yield f'event: message_start\ndata: {{"type":"message_start","message":{{"id":"{msg_id}","type":"message","role":"assistant","content":[],"model":"{model}","stop_reason":null,"stop_sequence":null,"usage":{{"input_tokens":0,"output_tokens":0}}}}}}\n\n'
+                        yield f'event: content_block_start\ndata: {{"type":"content_block_start","index":0,"content_block":{{"type":"text","text":""}}}}\n\n'
+                        yield f'event: ping\ndata: {{"type":"ping"}}\n\n'
 
                         full_response = b""
 
@@ -367,7 +389,7 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                                                 full_content += content
                                                 if flow_id:
                                                     flow_monitor.add_chunk(flow_id, content)
-                                                yield f'data: {{"type":"content_block_delta","index":0,"delta":{{"type":"text_delta","text":{json.dumps(content)}}}}}\n\n'
+                                                yield f'event: content_block_delta\ndata: {{"type":"content_block_delta","index":0,"delta":{{"type":"text_delta","text":{json.dumps(content)}}}}}\n\n'
                                         except Exception:
                                             pass
                                     pos += total_len
@@ -376,17 +398,17 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
 
                         result = parse_event_stream_full(full_response)
 
-                        yield f'data: {{"type":"content_block_stop","index":0}}\n\n'
+                        yield f'event: content_block_stop\ndata: {{"type":"content_block_stop","index":0}}\n\n'
 
                         if result["tool_uses"]:
                             for i, tool_use in enumerate(result["tool_uses"], 1):
-                                yield f'data: {{"type":"content_block_start","index":{i},"content_block":{{"type":"tool_use","id":"{tool_use["id"]}","name":"{tool_use["name"]}","input":{{}}}}}}\n\n'
-                                yield f'data: {{"type":"content_block_delta","index":{i},"delta":{{"type":"input_json_delta","partial_json":{json.dumps(json.dumps(tool_use["input"]))}}}}}\n\n'
-                                yield f'data: {{"type":"content_block_stop","index":{i}}}\n\n'
+                                yield f'event: content_block_start\ndata: {{"type":"content_block_start","index":{i},"content_block":{{"type":"tool_use","id":"{tool_use["id"]}","name":"{tool_use["name"]}","input":{{}}}}}}\n\n'
+                                yield f'event: content_block_delta\ndata: {{"type":"content_block_delta","index":{i},"delta":{{"type":"input_json_delta","partial_json":{json.dumps(json.dumps(tool_use["input"]))}}}}}\n\n'
+                                yield f'event: content_block_stop\ndata: {{"type":"content_block_stop","index":{i}}}\n\n'
 
                         stop_reason = result["stop_reason"]
-                        yield f'data: {{"type":"message_delta","delta":{{"stop_reason":"{stop_reason}","stop_sequence":null}},"usage":{{"output_tokens":100}}}}\n\n'
-                        yield f'data: {{"type":"message_stop"}}\n\n'
+                        yield f'event: message_delta\ndata: {{"type":"message_delta","delta":{{"stop_reason":"{stop_reason}","stop_sequence":null}},"usage":{{"output_tokens":100}}}}\n\n'
+                        yield f'event: message_stop\ndata: {{"type":"message_stop"}}\n\n'
 
                         # 完成 Flow
                         if flow_id:
@@ -405,6 +427,13 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                         current_account.request_count += 1
                         current_account.last_used = time.time()
                         get_rate_limiter().record_request(current_account.id)
+                        duration = (time.time() - start_time) * 1000
+                        state.add_log(RequestLog(
+                            id=log_id, timestamp=time.time(), method="POST", path="/v1/messages",
+                            model=model, account_id=current_account.id if current_account else None,
+                            status=200, duration_ms=duration, error=None
+                        ))
+                        stats_manager.record_request(account_id=current_account.id if current_account else "unknown", model=model, success=True, latency_ms=duration)
                         return
 
             except httpx.TimeoutException:
@@ -416,7 +445,14 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                     continue
                 if flow_id:
                     flow_monitor.fail_flow(flow_id, "timeout_error", "Request timeout after retries", 408)
-                yield f'data: {{"type":"error","error":{{"type":"api_error","message":"Request timeout after retries"}}}}\n\n'
+                yield f'event: error\ndata: {{"type":"error","error":{{"type":"api_error","message":"Request timeout after retries"}}}}\n\n'
+                duration = (time.time() - start_time) * 1000
+                state.add_log(RequestLog(
+                    id=log_id, timestamp=time.time(), method="POST", path="/v1/messages",
+                    model=model, account_id=current_account.id if current_account else None,
+                    status=408, duration_ms=duration, error="Request timeout after retries"
+                ))
+                stats_manager.record_request(account_id=current_account.id if current_account else "unknown", model=model, success=False, latency_ms=duration)
                 return
             except httpx.ConnectError:
                 if retry_count < max_retries:
@@ -427,7 +463,14 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                     continue
                 if flow_id:
                     flow_monitor.fail_flow(flow_id, "connection_error", "Connection error after retries", 502)
-                yield f'data: {{"type":"error","error":{{"type":"api_error","message":"Connection error after retries"}}}}\n\n'
+                yield f'event: error\ndata: {{"type":"error","error":{{"type":"api_error","message":"Connection error after retries"}}}}\n\n'
+                duration = (time.time() - start_time) * 1000
+                state.add_log(RequestLog(
+                    id=log_id, timestamp=time.time(), method="POST", path="/v1/messages",
+                    model=model, account_id=current_account.id if current_account else None,
+                    status=502, duration_ms=duration, error="Connection error after retries"
+                ))
+                stats_manager.record_request(account_id=current_account.id if current_account else "unknown", model=model, success=False, latency_ms=duration)
                 return
             except Exception as e:
                 # 检查是否为可重试的网络错误
@@ -439,7 +482,14 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
                     continue
                 if flow_id:
                     flow_monitor.fail_flow(flow_id, "api_error", str(e), 500)
-                yield f'data: {{"type":"error","error":{{"type":"api_error","message":"{str(e)}"}}}}\n\n'
+                yield f'event: error\ndata: {{"type":"error","error":{{"type":"api_error","message":"{str(e)}"}}}}\n\n'
+                duration = (time.time() - start_time) * 1000
+                state.add_log(RequestLog(
+                    id=log_id, timestamp=time.time(), method="POST", path="/v1/messages",
+                    model=model, account_id=current_account.id if current_account else None,
+                    status=500, duration_ms=duration, error=str(e)
+                ))
+                stats_manager.record_request(account_id=current_account.id if current_account else "unknown", model=model, success=False, latency_ms=duration)
                 return
 
     return StreamingResponse(generate(), media_type="text/event-stream")
@@ -452,8 +502,10 @@ async def _handle_non_stream(kiro_request, headers, account, model, log_id, star
     current_account = account
     max_retries = 2
     retry_ctx = RetryableRequest(max_retries=2)
+    should_log = False
 
     for retry in range(max_retries + 1):
+        should_log = False
         try:
             async with httpx.AsyncClient(verify=False, timeout=300) as client:
                 response = await client.post(KIRO_API_URL, json=kiro_request, headers=headers)
@@ -547,9 +599,11 @@ async def _handle_non_stream(kiro_request, headers, account, model, log_id, star
                         ),
                     )
 
+                should_log = True
                 return convert_kiro_response_to_anthropic(result, model, f"msg_{log_id}")
 
         except HTTPException:
+            should_log = True
             raise
         except httpx.TimeoutException as e:
             error_msg = f"Request timeout: {e}"
@@ -560,6 +614,7 @@ async def _handle_non_stream(kiro_request, headers, account, model, log_id, star
                 continue
             if flow_id:
                 flow_monitor.fail_flow(flow_id, "timeout_error", "Request timeout after retries", 408)
+            should_log = True
             raise HTTPException(408, "Request timeout after retries")
         except httpx.ConnectError as e:
             error_msg = f"Connection error: {e}"
@@ -570,6 +625,7 @@ async def _handle_non_stream(kiro_request, headers, account, model, log_id, star
                 continue
             if flow_id:
                 flow_monitor.fail_flow(flow_id, "connection_error", "Connection error after retries", 502)
+            should_log = True
             raise HTTPException(502, "Connection error after retries")
         except Exception as e:
             error_msg = str(e)
@@ -581,9 +637,10 @@ async def _handle_non_stream(kiro_request, headers, account, model, log_id, star
                 continue
             if flow_id:
                 flow_monitor.fail_flow(flow_id, "api_error", str(e), 500)
+            should_log = True
             raise HTTPException(500, str(e))
         finally:
-            if retry == max_retries or status_code == 200:
+            if should_log:
                 duration = (time.time() - start_time) * 1000
                 state.add_log(RequestLog(
                     id=log_id,

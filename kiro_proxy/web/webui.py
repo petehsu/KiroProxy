@@ -377,6 +377,7 @@ unset ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_DISABLE_NONESSENTIAL_T
         <tr><td><code>claude-sonnet-4.5</code></td><td>⭐⭐⭐⭐ 更强</td><td>gemini-1.5-pro</td></tr>
         <tr><td><code>claude-haiku-4.5</code></td><td>⚡ 快速</td><td>gpt-4o-mini, gpt-3.5-turbo, haiku</td></tr>
         <tr><td><code>claude-opus-4.5</code></td><td>⭐⭐⭐⭐⭐ 最强</td><td>o1, o1-preview, opus</td></tr>
+        <tr><td><code>claude-opus-4.6</code></td><td>🚀 旗舰</td><td>opus-4.6</td></tr>
         <tr><td><code>auto</code></td><td>🤖 自动</td><td>auto</td></tr>
       </tbody>
     </table>
@@ -602,8 +603,9 @@ $$('.tab').forEach(t=>t.onclick=()=>{
   $$('.panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
   $('#'+t.dataset.tab).classList.add('active');
+  stopLogsAutoRefresh();
   if(t.dataset.tab==='monitor'){loadStats();loadQuota();}
-  if(t.dataset.tab==='logs')loadLogs();
+  if(t.dataset.tab==='logs')startLogsAutoRefresh();
   if(t.dataset.tab==='accounts')loadAccounts();
   if(t.dataset.tab==='flows'){loadFlowStats();loadFlows();}
 });
@@ -768,6 +770,7 @@ async function runSpeedtest(){
 
 JS_LOGS = '''
 // Logs
+let logsInterval;
 async function loadLogs(){
   try{
     const r=await fetch('/api/logs?limit=50');
@@ -783,6 +786,14 @@ async function loadLogs(){
       </tr>
     `).join('');
   }catch(e){console.error(e)}
+}
+function startLogsAutoRefresh(){
+  if(logsInterval)clearInterval(logsInterval);
+  loadLogs();
+  logsInterval=setInterval(loadLogs,3000);
+}
+function stopLogsAutoRefresh(){
+  if(logsInterval){clearInterval(logsInterval);logsInterval=null;}
 }
 '''
 

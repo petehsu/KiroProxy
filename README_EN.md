@@ -368,7 +368,4 @@ The output files will be generated in the `dist/` directory.
 
 This project is for learning and research purposes only. Please use it in compliance with the applicable terms of service and relevant usage rules. Any consequences arising from the use of this project are the sole responsibility of the user.
 
-This project is not officially affiliated with Kiro, AWS, Anthropic, or OpenAI.
-
-```
-```
+This project is not officially affiliated with Kiro, AWS, Anthropic, Google or OpenAI.

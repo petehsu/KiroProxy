@@ -369,4 +369,4 @@ python build.py
 
 本项目仅供学习与研究用途，请在遵守相关服务条款与适用规则的前提下使用。使用本项目产生的任何后果由使用者自行承担，与作者无关。
 
-本项目与 Kiro / AWS / Anthropic / OpenAI 官方无直接关联。
+本项目与 Kiro / AWS / Anthropic / Google / OpenAI 官方无直接关联。

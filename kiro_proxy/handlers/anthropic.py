@@ -109,7 +109,7 @@ async def _call_kiro_for_summary(prompt: str, account, headers: dict) -> str:
     creds = account.get_credentials()
     kiro_request = build_kiro_request(prompt, "claude-haiku-4.5", [], credentials=creds)  # 用快速模型生成摘要
     try:
-        async with httpx.AsyncClient(verify=get_httpx_verify_setting(), timeout=60) as client:
+        async with create_async_client(timeout=60, account_proxy_url=account.get_proxy_url()) as client:
             resp = await client.post(KIRO_API_URL, json=kiro_request, headers=headers)
             if resp.status_code == 200:
                 return parse_event_stream(resp.content)
@@ -246,7 +246,7 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
         
         while retry_count <= max_retries:
             try:
-                async with httpx.AsyncClient(verify=get_httpx_verify_setting(), timeout=300) as client:
+                async with create_async_client(timeout=300, account_proxy_url=current_account.get_proxy_url()) as client:
                     async with client.stream("POST", KIRO_API_URL, json=kiro_request, headers=headers) as response:
                         
                         # 处理配额超限
@@ -477,7 +477,7 @@ async def _handle_non_stream(kiro_request, headers, account, model, log_id, star
 
     for retry in range(max_retries + 1):
         try:
-            async with httpx.AsyncClient(verify=get_httpx_verify_setting(), timeout=300) as client:
+            async with create_async_client(timeout=300, account_proxy_url=current_account.get_proxy_url()) as client:
                 response = await client.post(KIRO_API_URL, json=kiro_request, headers=headers)
                 status_code = response.status_code
 

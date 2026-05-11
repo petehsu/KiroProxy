@@ -20,7 +20,7 @@ from ..core.history_manager import HistoryManager, get_history_config
 from ..core.error_handler import classify_error, ErrorType, format_error_log
 from ..core.rate_limiter import get_rate_limiter
 from ..core.auth_guard import ensure_profile_arn_ready
-from ..http_client import get_httpx_verify_setting
+from ..http_client import get_httpx_verify_setting, create_async_client
 from ..kiro_api import build_headers, build_kiro_request, parse_event_stream, parse_event_stream_full, is_quota_exceeded_error
 
 
@@ -673,7 +673,7 @@ async def handle_responses(request: Request):
     async def api_caller(prompt: str) -> str:
         req = build_kiro_request(prompt, "claude-haiku-4.5", [], credentials=creds)
         try:
-            async with httpx.AsyncClient(verify=get_httpx_verify_setting(), timeout=60) as client:
+            async with create_async_client(timeout=60, account_proxy_url=account.get_proxy_url()) as client:
                 resp = await client.post(KIRO_API_URL, json=req, headers=headers)
                 if resp.status_code == 200:
                     return parse_event_stream(resp.content)
@@ -793,7 +793,7 @@ async def handle_responses(request: Request):
         return await _handle_stream(kiro_request, headers, account, model, log_id, start_time)
     
     # 非流式
-    async with httpx.AsyncClient(verify=get_httpx_verify_setting(), timeout=120) as client:
+    async with create_async_client(timeout=120, account_proxy_url=account.get_proxy_url()) as client:
         resp = await client.post(KIRO_API_URL, json=kiro_request, headers=headers)
         if resp.status_code != 200:
             raise HTTPException(resp.status_code, resp.text)
@@ -861,7 +861,7 @@ async def _handle_stream(kiro_request, headers, account, model, log_id, start_ti
         _debug(f"[Responses] Request: model={model}, log_id={log_id}")
         
         try:
-            async with httpx.AsyncClient(verify=get_httpx_verify_setting(), timeout=300) as client:
+            async with create_async_client(timeout=300, account_proxy_url=account.get_proxy_url()) as client:
                 async with client.stream("POST", KIRO_API_URL, json=kiro_request, headers=headers) as response:
                     
                     if response.status_code != 200:

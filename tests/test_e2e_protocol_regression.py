@@ -63,6 +63,9 @@ class _DummyAccount:
     def mark_quota_exceeded(self, _reason=""):
         return None
 
+    def get_proxy_url(self):
+        return None
+
 
 class _FakeHTTPResponse:
     def __init__(self, status_code=200, content=b"", chunks=None, text=None):

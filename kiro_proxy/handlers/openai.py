@@ -109,7 +109,7 @@ async def handle_chat_completions(request: Request):
     async def call_summary(prompt: str) -> str:
         req = build_kiro_request(prompt, "claude-haiku-4.5", [], credentials=creds)
         try:
-            async with httpx.AsyncClient(verify=get_httpx_verify_setting(), timeout=60) as client:
+            async with create_async_client(timeout=60, account_proxy_url=account.get_proxy_url()) as client:
                 resp = await client.post(KIRO_API_URL, json=req, headers=headers)
                 if resp.status_code == 200:
                     return parse_event_stream(resp.content)
@@ -161,7 +161,7 @@ async def handle_chat_completions(request: Request):
     
     for retry in range(max_retries + 1):
         try:
-            async with httpx.AsyncClient(verify=get_httpx_verify_setting(), timeout=120) as client:
+            async with create_async_client(timeout=120, account_proxy_url=current_account.get_proxy_url()) as client:
                 resp = await client.post(KIRO_API_URL, json=kiro_request, headers=headers)
                 status_code = resp.status_code
                 

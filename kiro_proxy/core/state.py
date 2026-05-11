@@ -52,7 +52,8 @@ class ProxyState:
                         id=acc_data["id"],
                         name=acc_data["name"],
                         token_path=acc_data["token_path"],
-                        enabled=acc_data.get("enabled", True)
+                        enabled=acc_data.get("enabled", True),
+                        proxy_url=acc_data.get("proxy_url"),
                     ))
             print(f"[State] 从配置加载 {len(self.accounts)} 个账号")
         
@@ -72,7 +73,8 @@ class ProxyState:
                 "id": acc.id,
                 "name": acc.name,
                 "token_path": acc.token_path,
-                "enabled": acc.enabled
+                "enabled": acc.enabled,
+                "proxy_url": acc.proxy_url,
             }
             for acc in self.accounts
         ]

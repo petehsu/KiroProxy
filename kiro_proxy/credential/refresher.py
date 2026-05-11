@@ -5,14 +5,15 @@ from typing import Tuple
 
 from .types import KiroCredentials
 from .fingerprint import generate_machine_id, get_kiro_version
-from ..http_client import get_httpx_verify_setting
+from ..http_client import get_httpx_verify_setting, create_async_client
 
 
 class TokenRefresher:
     """Token 刷新器"""
     
-    def __init__(self, credentials: KiroCredentials):
+    def __init__(self, credentials: KiroCredentials, proxy_url: str = None):
         self.credentials = credentials
+        self.proxy_url = proxy_url
 
     def _resolve_auth_method(self) -> str:
         method = (self.credentials.auth_method or "").strip().lower()
@@ -73,7 +74,7 @@ class TokenRefresher:
         kiro_version = get_kiro_version()
         
         try:
-            async with httpx.AsyncClient(verify=get_httpx_verify_setting(), timeout=30) as client:
+            async with create_async_client(timeout=30, account_proxy_url=self.proxy_url) as client:
                 if auth_method == "idc":
                     if not self.credentials.client_id or not self.credentials.client_secret:
                         return False, "IdC 认证缺少 client_id 或 client_secret"

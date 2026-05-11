@@ -22,6 +22,7 @@ class Account:
     error_count: int = 0
     last_used: Optional[float] = None
     status: CredentialStatus = CredentialStatus.ACTIVE
+    proxy_url: Optional[str] = None  # Per-account proxy URL (HTTP/SOCKS5)
     
     _credentials: Optional[KiroCredentials] = field(default=None, repr=False)
     _machine_id: Optional[str] = field(default=None, repr=False)
@@ -124,7 +125,7 @@ class Account:
         if not creds:
             return False, "无法加载凭证"
         
-        refresher = TokenRefresher(creds)
+        refresher = TokenRefresher(creds, proxy_url=self.get_proxy_url())
         success, result = await refresher.refresh()
         
         if success:
@@ -151,6 +152,19 @@ class Account:
         else:
             self.error_count += 1
     
+    def get_proxy_url(self) -> Optional[str]:
+        """Get normalized proxy URL for this account.
+
+        Returns per-account proxy if set, otherwise None (caller
+        should fall back to the global proxy).
+        """
+        url = (self.proxy_url or "").strip()
+        if not url:
+            return None
+        if not url.startswith(("http://", "https://", "socks5://", "socks4://")):
+            url = f"http://{url}"
+        return url
+
     def get_status_info(self) -> dict:
         """获取状态信息"""
         cooldown_remaining = quota_manager.get_cooldown_remaining(self.id)
@@ -170,4 +184,5 @@ class Account:
             "auth_method": creds.auth_method if creds else None,
             "has_refresh_token": bool(creds and creds.refresh_token),
             "idc_config_complete": bool(creds and creds.client_id and creds.client_secret) if creds and creds.auth_method == "idc" else None,
+            "proxy_url": self.proxy_url or None,
         }

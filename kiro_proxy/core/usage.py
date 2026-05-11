@@ -7,7 +7,7 @@ import httpx
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from ..http_client import get_httpx_verify_setting
+from ..http_client import get_httpx_verify_setting, create_async_client
 
 
 # API 端点
@@ -123,6 +123,7 @@ async def get_usage_limits(
     profile_arn: Optional[str] = None,
     machine_id: str = "",
     kiro_version: str = "1.0.0",
+    proxy_url: Optional[str] = None,
 ) -> Tuple[bool, UsageInfo | dict]:
     """
     获取 Kiro 用量信息
@@ -148,7 +149,7 @@ async def get_usage_limits(
     headers = build_usage_headers(access_token, machine_id, kiro_version)
     
     try:
-        async with httpx.AsyncClient(timeout=10, verify=get_httpx_verify_setting()) as client:
+        async with create_async_client(timeout=10, account_proxy_url=proxy_url) as client:
             response = await client.get(url, headers=headers)
             
             if response.status_code != 200:
@@ -190,4 +191,5 @@ async def get_account_usage(account) -> Tuple[bool, UsageInfo | dict]:
         profile_arn=creds.profile_arn,
         machine_id=account.get_machine_id(),
         kiro_version=get_kiro_version(),
+        proxy_url=account.get_proxy_url(),
     )

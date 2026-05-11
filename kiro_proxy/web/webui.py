@@ -820,11 +820,21 @@ async function loadAccounts(){
             <div class="account-meta-item"><span>${_('accounts.errors')}</span><span>${a.error_count}</span></div>
             <div class="account-meta-item"><span>${_('accounts.token')}</span><span class="badge ${tokenBadge}">${tokenStatus}</span></div>
             ${a.cooldown_remaining?`<div class="account-meta-item"><span>${_('accounts.cooldown')}</span><span>${a.cooldown_remaining}s</span></div>`:''}
+            <div class="account-meta-item"><span>${_('accounts.proxy')}</span><span style="font-family:monospace;font-size:0.75rem">${a.proxy_url||_('accounts.proxyGlobal')}</span></div>
+          </div>
+          <div id="proxy-edit-${a.id}" style="display:none;margin-top:0.5rem;padding:0.5rem;background:var(--bg);border-radius:6px">
+            <div style="display:flex;gap:0.5rem;align-items:center">
+              <input id="proxy-input-${a.id}" type="text" value="${a.proxy_url||''}" placeholder="http://127.0.0.1:7890 / socks5://..." style="flex:1;padding:0.4rem;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-family:monospace;font-size:0.8rem">
+              <button class="secondary small" onclick="saveAccountProxy('${a.id}')">${_('common.save')}</button>
+              <button class="secondary small" onclick="$('#proxy-edit-${a.id}').style.display='none'">${_('common.cancel')}</button>
+            </div>
+            <p style="color:var(--muted);font-size:0.7rem;margin-top:0.3rem">${_('accounts.proxyHint')}</p>
           </div>
           <div id="usage-${a.id}" class="account-usage" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--bg);border-radius:6px"></div>
           <div class="account-actions">
             <button class="secondary small" onclick="queryUsage('${a.id}')">${_('accounts.queryUsage')}</button>
             <button class="secondary small" onclick="refreshToken('${a.id}')">${_('accounts.refreshToken')}</button>
+            <button class="secondary small" onclick="$('#proxy-edit-${a.id}').style.display='block'">${_('accounts.setProxy')}</button>
             <button class="secondary small" onclick="viewAccountDetail('${a.id}')">${_('accounts.details')}</button>
             ${a.status==='cooldown'?`<button class="secondary small" onclick="restoreAccount('${a.id}')">${_('accounts.restore')}</button>`:''}
             <button class="secondary small" onclick="toggleAccount('${a.id}')">${a.enabled?_('common.disabled'):_('common.enabled')}</button>
@@ -914,6 +924,21 @@ async function deleteAccount(id){
     await fetch('/api/accounts/'+id,{method:'DELETE'});
     loadAccounts();
   }
+}
+
+async function saveAccountProxy(id){
+  const input=$('#proxy-input-'+id);
+  const proxy_url=(input?input.value:'').trim();
+  try{
+    const r=await fetch('/api/accounts/'+id+'/proxy',{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({proxy_url})
+    });
+    const d=await r.json();
+    if(d.ok){loadAccounts();}
+    else{alert(d.detail||'设置失败');}
+  }catch(e){alert('设置失败: '+e.message);}
 }
 
 function showAddAccount(){
@@ -1521,6 +1546,8 @@ const I18N = {{
   "common.disabled": "{js_escape(t('common.disabled'))}",
   "common.delete": "{js_escape(t('common.delete'))}",
   "common.loading": "{js_escape(t('common.loading'))}",
+  "common.save": "{js_escape(t('common.save'))}",
+  "common.cancel": "{js_escape(t('common.cancel'))}",
   "common.restore": "{js_escape(t('accounts.restore'))}",
   "accounts.available": "{js_escape(t('accounts.available'))}",
   "accounts.cooldown": "{js_escape(t('accounts.cooldown'))}",
@@ -1536,6 +1563,10 @@ const I18N = {{
   "accounts.refreshToken": "{js_escape(t('accounts.refreshToken'))}",
   "accounts.details": "{js_escape(t('accounts.details'))}",
   "accounts.restore": "{js_escape(t('accounts.restore'))}",
+  "accounts.proxy": "{js_escape(t('accounts.proxy'))}",
+  "accounts.proxyGlobal": "{js_escape(t('accounts.proxyGlobal'))}",
+  "accounts.proxyHint": "{js_escape(t('accounts.proxyHint'))}",
+  "accounts.setProxy": "{js_escape(t('accounts.setProxy'))}",
   "accounts.noAccounts": "{js_escape(t('accounts.noAccounts'))}",
   "accounts.scan": "{js_escape(t('accounts.scan'))}",
   "accounts.alreadyAdded": "{js_escape(t('accounts.alreadyAdded'))}",

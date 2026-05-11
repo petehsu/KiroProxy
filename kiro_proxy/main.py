@@ -230,6 +230,11 @@ async def api_toggle_account(account_id: str):
     return await admin.toggle_account(account_id)
 
 
+@app.put("/api/accounts/{account_id}/proxy")
+async def api_update_account_proxy(account_id: str, request: Request):
+    return await admin.update_account_proxy(account_id, request)
+
+
 @app.post("/api/speedtest")
 async def api_speedtest():
     return await admin.speedtest()

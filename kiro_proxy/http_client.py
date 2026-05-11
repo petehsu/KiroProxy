@@ -82,21 +82,24 @@ def get_httpx_proxy_config() -> Optional[str]:
 def create_async_client(
     timeout: float = 30.0,
     follow_redirects: bool = True,
+    account_proxy_url: Optional[str] = None,
     **kwargs,
 ) -> httpx.AsyncClient:
     """Create a configured httpx.AsyncClient with proxy and TLS settings.
 
     This is the recommended way to create HTTP clients for Kiro API calls.
+    Per-account proxy takes priority over the global proxy.
 
     Args:
         timeout: Request timeout in seconds.
         follow_redirects: Whether to follow redirects.
+        account_proxy_url: Per-account proxy URL. Takes priority over global proxy.
         **kwargs: Additional kwargs passed to httpx.AsyncClient.
 
     Returns:
         Configured httpx.AsyncClient instance.
     """
-    proxy = get_httpx_proxy_config()
+    proxy = account_proxy_url or get_httpx_proxy_config()
     verify = get_httpx_verify_setting()
 
     client_kwargs = {

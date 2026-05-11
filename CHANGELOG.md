@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.8.1 - 2026-05-11
+
+### Per-account proxy
+- Added `proxy_url` field to Account, allowing each account to use a separate HTTP/SOCKS5 proxy.
+- Account proxy takes priority over the global `KIRO_VPN_PROXY_URL`; empty falls back to global or direct.
+- All outbound paths use account proxy: Kiro API calls, token refresh, health checks, usage queries.
+- New API endpoint: `PUT /api/accounts/{id}/proxy` for updating proxy per account.
+- Web UI: inline proxy display and edit per account card.
+- i18n: Chinese and English translations for proxy UI strings.
+
+## v1.8.0 - 2026-05-10
+
+### Comprehensive upgrade (15 optimizations)
+- Dynamic model resolution (4-layer pipeline).
+- Payload size guard (615KB limit detection + auto-trimming).
+- Truncation recovery (detect truncated responses + inject synthetic messages).
+- Global VPN/Proxy support (HTTP/SOCKS5 via `KIRO_VPN_PROXY_URL`).
+- loguru structured logging (levels, file output, debug mode).
+- `.env` configuration via python-dotenv.
+- Docker deployment (Dockerfile + docker-compose).
+- tiktoken token counting (replaces rough `len/4` estimation).
+- Extended Thinking FSM parser.
+- kiro-cli SQLite auth integration.
+- Prompt Caching (cache_control → cachePoint).
+- Tool Search (regex + BM25).
+- Circuit Breaker (exponential backoff + probabilistic retry).
+- Pydantic data validation models.
+- Comprehensive type hints and docstrings.
+
 ## v1.7.17 - 2026-04-18
 
 ### Core fixes

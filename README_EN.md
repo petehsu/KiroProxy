@@ -43,6 +43,30 @@ It can serve as a unified integration layer for tools such as Claude Code, Codex
 - **Web UI** - A clean admin interface with monitoring, logs, and settings
 - **Multilingual interface** - Supports both Chinese and English UI switching
 
+### What's New in v1.8.1
+- **Per-account proxy** - Each Kiro account can have its own proxy server (HTTP/SOCKS5)
+  - Account proxy takes priority over the global proxy; leave empty to fall back to global proxy or direct connection
+  - Web UI supports inline proxy editing per account
+  - API: `PUT /api/accounts/{id}/proxy`
+  - Covers all request paths: API calls, token refresh, health checks, usage queries
+
+### What's New in v1.8.0
+- **Dynamic model resolution** - 4-layer pipeline: normalize → cache → alias → pass-through
+- **Payload size guard** - 615KB limit detection + auto-trimming
+- **Truncation recovery** - Detect truncated responses + inject synthetic recovery messages
+- **VPN/Proxy support** - Global HTTP/SOCKS5 proxy
+- **loguru logging** - Structured logging with levels, file output, debug mode
+- **.env configuration** - python-dotenv environment variable management
+- **Docker deployment** - Dockerfile + docker-compose
+- **tiktoken token counting** - Accurate token counting (replaces rough estimation)
+- **Extended Thinking FSM** - Finite state machine parser
+- **kiro-cli SQLite auth** - Integration with kiro-cli database
+- **Prompt Caching** - cache_control → cachePoint conversion
+- **Tool Search** - regex + BM25 tool search
+- **Circuit Breaker** - Exponential backoff + probabilistic retry
+- **Pydantic validation** - Request/response model validation
+- **Type hints** - Comprehensive type annotations
+
 ### What's New in v1.7.2
 - **Multilingual support** - Full Chinese / English switching in the Web UI
 - **Bilingual launcher** - Port / language settings with clearer launch actions
